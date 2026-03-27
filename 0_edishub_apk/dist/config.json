@@ -1,0 +1,9 @@
+{
+    "BASE_URL": "https://ekirdishub.arunovasi.com/rfid/check/",
+    "AUTO_START_MODE": "NONE",
+    "LOGO_PATH": "logo.ico",
+    "MODE_TYPE": false,
+    "MODE_COPY": true,
+    "MODE_FOCUS": false,
+    "MODE_RAW_READ": true
+}

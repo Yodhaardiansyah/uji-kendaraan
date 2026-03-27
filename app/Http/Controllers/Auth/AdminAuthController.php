@@ -26,7 +26,6 @@ class AdminAuthController extends Controller
         ]);
 
         // 2. Percobaan Login dengan Guard 'admin'
-        // Menambahkan fitur 'remember' agar admin tidak perlu login ulang tiap tutup browser
         if (Auth::guard('admin')->attempt($credentials, $request->boolean('remember'))) {
             
             // 3. Proteksi Session Fixation
@@ -45,7 +44,6 @@ class AdminAuthController extends Controller
         }
 
         // 5. Feedback Gagal Login
-        // Menggunakan ValidationException agar pesan error muncul di variabel $errors
         throw ValidationException::withMessages([
             'email' => ['Kredensial yang diberikan tidak cocok dengan data kami.'],
         ]);
