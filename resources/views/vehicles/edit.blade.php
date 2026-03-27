@@ -1,12 +1,15 @@
+{{-- Mewarisi kerangka utama website --}}
 @extends('layouts.app')
 
+{{-- Menentukan judul tab browser secara dinamis dengan menyertakan Nomor Uji --}}
 @section('title', 'Edit Kendaraan: ' . $vehicle->no_uji . ' - Dishub System')
 
+{{-- Membuka blok konten utama --}}
 @section('content')
 <div class="row justify-content-center">
     <div class="col-lg-10">
 
-        {{-- HEADER --}}
+        {{-- ================= HEADER & TOMBOL KEMBALI ================= --}}
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4 class="fw-bold text-primary mb-0">
                 <i class="bi bi-pencil-square me-2"></i>Edit Data Kendaraan
@@ -17,7 +20,8 @@
             </a>
         </div>
 
-        {{-- ERROR HANDLER --}}
+        {{-- ================= BLOK NOTIFIKASI ERROR ================= --}}
+        {{-- Muncul jika validasi di VehicleController@update gagal --}}
         @if ($errors->any())
             <div class="alert alert-danger shadow-sm alert-dismissible fade show">
                 <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-2"></i>Terdapat kesalahan:</div>
@@ -30,12 +34,17 @@
             </div>
         @endif
 
-        {{-- FORM UPDATE --}}
+        {{-- 
+          FORM UPDATE DATA 
+          Action: Mengarah ke route update dengan parameter ID kendaraan terkait.
+          Method: POST yang di-spoofing menjadi PUT menggunakan @method('PUT').
+        --}}
         <form method="POST" action="{{ route('vehicles.update', $vehicle->id) }}">
             @csrf
-            @method('PUT') {{-- WAJIB ADA UNTUK UPDATE --}}
+            @method('PUT') 
 
             {{-- ================= A. IDENTITAS PEMILIK ================= --}}
+            {{-- Bagian untuk mengubah relasi kendaraan ke pemilik (User) lain --}}
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-primary text-white fw-bold pt-3">A. Identitas Pemilik Kendaraan</div>
                 <div class="card-body">
@@ -45,6 +54,11 @@
                             <select name="user_id" class="form-select" required>
                                 <option value="">-- Pilih Pemilik dari Data User --</option>
                                 @foreach ($users as $user)
+                                    {{-- 
+                                      LOGIKA SELECTION:
+                                      1. Cek inputan terakhir user (old).
+                                      2. Jika tidak ada, gunakan user_id yang tersimpan di database saat ini.
+                                    --}}
                                     <option value="{{ $user->id }}" {{ old('user_id', $vehicle->user_id) == $user->id ? 'selected' : '' }}>
                                         {{ $user->nama }}
                                     </option>
@@ -82,7 +96,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Tanggal SRUT</label>
-                            {{-- Ubah format tanggal agar bisa dibaca input type date --}}
+                            {{-- Memformat objek Carbon menjadi string Y-m-d agar bisa terbaca oleh tag input date --}}
                             <input type="date" name="tgl_srut" class="form-control" value="{{ old('tgl_srut', $vehicle->tgl_srut ? $vehicle->tgl_srut->format('Y-m-d') : '') }}">
                         </div>
                     </div>
@@ -94,7 +108,7 @@
                 <div class="card-header bg-primary text-white fw-bold pt-3">C. Spesifikasi Teknis Kendaraan</div>
                 <div class="card-body">
                     
-                    {{-- Sub 1: Info Dasar Mesin & Tipe --}}
+                    {{-- 1. Data Dasar & Mesin --}}
                     <div class="p-3 bg-light rounded mb-4 border">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">1. Data Dasar & Mesin</h6>
                         <div class="row g-3">
@@ -110,6 +124,7 @@
                                 <label class="form-label fw-semibold">Jenis <span class="text-danger">*</span></label>
                                 <select name="jenis" class="form-select" required>
                                     <option value="">-- Pilih --</option>
+                                    {{-- Looping array statis untuk pilihan Jenis Kendaraan --}}
                                     @foreach(['Sepeda Motor', 'Mobil Penumpang', 'Mobil Bus', 'Mobil Barang', 'Kendaraan Khusus'] as $jenis)
                                         <option value="{{ $jenis }}" {{ old('jenis', $vehicle->jenis) == $jenis ? 'selected' : '' }}>{{ $jenis }}</option>
                                     @endforeach
@@ -145,7 +160,7 @@
                         </div>
                     </div>
 
-                    {{-- Sub 2: Berat Kendaraan --}}
+                    {{-- 2. Kapasitas & Berat --}}
                     <div class="p-3 bg-light rounded mb-4 border">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">2. Kapasitas & Berat</h6>
                         <div class="row g-3">
@@ -176,7 +191,7 @@
                         </div>
                     </div>
 
-                    {{-- Sub 3: Ban & Sumbu --}}
+                    {{-- 3. Ban & Sumbu --}}
                     <div class="p-3 bg-light rounded mb-4 border">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">3. Konfigurasi Roda, Ban & Sumbu</h6>
                         <div class="row g-3">
@@ -217,7 +232,7 @@
                         </div>
                     </div>
 
-                    {{-- Sub 4: Dimensi --}}
+                    {{-- 4. Dimensi --}}
                     <div class="p-3 bg-light rounded mb-4 border">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">4. Dimensi Utama & Bak/Tangki</h6>
                         <div class="row g-3">
@@ -252,7 +267,7 @@
                         </div>
                     </div>
 
-                    {{-- Sub 5: Daya Angkut & Jalan --}}
+                    {{-- 5. Daya Angkut & Jalan --}}
                     <div class="p-3 bg-light rounded border">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">5. Daya Angkut & Kelas Jalan</h6>
                         <div class="row g-3">
@@ -305,9 +320,11 @@
                 </div>
             </div>
 
-            {{-- SUMBUT BUTTONS --}}
+            {{-- ================= TOMBOL AKSI ================= --}}
             <div class="text-end mb-5">
+                {{-- Tombol Batal: Mengembalikan ke halaman index kendaraan --}}
                 <a href="{{ route('vehicles.index') }}" class="btn btn-light shadow-sm me-2 border"><i class="bi bi-x-circle me-1"></i> Batal</a>
+                {{-- Tombol Simpan: Mengirimkan form --}}
                 <button type="submit" class="btn btn-primary shadow-sm px-4"><i class="bi bi-save me-1"></i> Simpan Perubahan</button>
             </div>
 

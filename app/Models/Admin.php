@@ -11,7 +11,7 @@ class Admin extends Authenticatable
     'nrp',       // Nomor Registrasi Petugas
     'pangkat',   // Pangkat/Golongan
     'dishub_id', // Relasi ke wilayah
-    'email',     // Digunakan untuk login (pengganti username)
+    'email',     // Digunakan untuk login 
     'password',
     'role'       
 ];

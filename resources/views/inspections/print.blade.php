@@ -4,33 +4,45 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cetak Sertifikat - {{ $vehicle->no_kendaraan }}</title>
+    
+    {{-- ================= PRINT-SPECIFIC CSS ================= --}}
     <style>
-        /* MENGHILANGKAN HEADER/FOOTER BAWAAN BROWSER & SETUP KERTAS F4 */
+        /* 1. PAPER & BROWSER SETUP 
+          Configures the browser's print dialog to default to F4 paper size (215mm x 330mm).
+          'margin: 0' removes default browser headers/footers (like URL or Date) when printing.
+        */
         @page { size: 215mm 330mm; margin: 0; }
         
         body { 
             background: white; 
             margin: 0; 
-            /* Padding diperkecil agar ruang konten lebih panjang */
+            /* Inner padding to act as the document's actual margin */
             padding: 8mm 10mm; 
             font-size: 8.5pt; 
+            /* Using a standard system font ensures consistency across different computers/printers */
             font-family: "Times New Roman", Times, serif;
             color: black;
             line-height: 1.1; 
             box-sizing: border-box;
         }
 
-        /* STYLE LAYOUT TABEL UTAMA */
+        /* 2. TABLE LAYOUT STYLES 
+          Since Bootstrap is not used, traditional HTML tables are utilized 
+          to create the rigid grid structure required for formal certificates.
+        */
         .print-layout-container { width: 100%; max-width: 100%; position: relative; }
         
+        /* Main structural table */
         .print-table { border-collapse: collapse; width: 100%; margin-bottom: -1px; table-layout: fixed; }
         .print-table > tbody > tr > td { border: 1px solid black; vertical-align: top; padding: 0; }
         
+        /* Inner tables for specific data points (Identity, Specs, etc.) */
         .print-inner-table { border-collapse: collapse; width: 100%; }
-        /* Padding diperkecil agar tabel lebih padat */
         .print-inner-table td { padding: 1px 3px; vertical-align: top; }
 
-        /* HEADER TEXT STYLING */
+        /* 3. TYPOGRAPHY CLASSES 
+          Pre-defined styles for headers, subheaders, and section dividers.
+        */
         .header-title { font-size: 13px; font-weight: bold; margin: 0; padding: 0; }
         .header-subtitle { font-size: 9px; margin: 0; padding: 0; font-weight: normal; }
         .header-dept { font-size: 11px; margin: 0; padding: 0; font-weight: bold; }
@@ -43,13 +55,19 @@
             font-weight: bold;
         }
 
-        /* MEMASTIKAN BISA DICETAK SEMPURNA */
+        /* 4. PRINT OPTIMIZATION HACKS 
+          Forces browsers (especially Chrome/Edge) to print background colors and images 
+          (like the warning box color or the KAN logo).
+        */
         * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
             box-sizing: border-box;
         }
         
+        /* 5. MEDIA PRINT QUERY 
+          Hides UI elements (like the "Print Again" button) when the document is actively being printed.
+        */
         @media print {
             .btn-print { display: none !important; }
         }
@@ -59,10 +77,11 @@
     
     <div class="print-layout-container">
         
-        {{-- HEADER DOKUMEN CETAK --}}
+        {{-- ================= HEADER SECTION ================= --}}
+        {{-- Contains Logos, Department Names, and the QR Code --}}
         <div style="position: relative; text-align: center; margin-bottom: 5px; width: 100%;">
             
-            {{-- LOGO DISHUB --}}
+            {{-- Official Dishub Logo --}}
             <img src="{{ asset('images/logo-dishub.png') }}" style="height: 45px; margin-bottom: 2px;" alt="Logo Dishub">
             
             <p class="header-title">KARTU UJI BERKALA KENDARAAN BERMOTOR</p>
@@ -71,26 +90,32 @@
             <p class="header-dept" style="margin-top: 2px;">a.n. DIREKTUR JENDERAL PERHUBUNGAN DARAT</p>
             <p class="header-dept">DIREKTUR SARANA TRANSPORTASI JALAN</p>
             
-            {{-- Bahasa Inggris Jabatan --}}
+            {{-- English Translation of Department --}}
             <p class="header-subtitle" style="font-style: italic;">DIRECTOR GENERAL OF LAND TRANSPORTATION</p>
             <p class="header-subtitle" style="font-style: italic;">DIRECTOR OF ROAD TRANSPORT FACILITIES</p>
             
-            {{-- Nama Direktur & NIP --}}
+            {{-- Director's Name & NIP (Fallback data provided via ?? operator) --}}
             <div style="margin-top: 5px;">
                 <p style="margin:0; font-weight:bold; font-size:11px; text-decoration: underline;">{{ $inspection->direktur_nama ?? 'AMIRULLOH' }}</p>
                 <p style="margin:0; font-size:9px;">Pembina Utama Muda - IV/c</p>
                 <p style="margin:0; font-size:9px;">NIP {{ $inspection->direktur_nip ?? '19740730 199703 1 001' }}</p>
             </div>
             
-            {{-- QR CODE SVG DI KANAN BAWAH --}}
+            {{-- 
+              QR CODE GENERATION 
+              Utilizes simple-qrcode package. Positioned absolute to lock it to the bottom right of the header.
+              The URL points to the public verification route using the RFID code.
+            --}}
             <div style="position: absolute; bottom: 0px; right: 0;">
                 {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(70)->margin(0)->generate("https://ekirdishub.arunovasi.com/rfid/check/" . $rfid->kode_rfid) !!}
             </div>
         </div>
 
-        {{-- BAGIAN IDENTITAS --}}
+        {{-- ================= ROW 1: IDENTITY ================= --}}
+        {{-- Splits the row into 50% / 50% for Owner and Vehicle IDs --}}
         <table class="print-table">
             <tr>
+                {{-- Left Column: Owner Identity --}}
                 <td style="width: 50%;">
                     <div class="section-title">
                         IDENTITAS PEMILIK KENDARAAN BERMOTOR<br>
@@ -109,6 +134,8 @@
                         </tr>
                     </table>
                 </td>
+                
+                {{-- Right Column: Vehicle Identity --}}
                 <td style="width: 50%;">
                     <div class="section-title">
                         IDENTITAS KENDARAAN BERMOTOR<br>
@@ -145,7 +172,7 @@
             </tr>
         </table>
 
-        {{-- BAGIAN FOTO --}}
+        {{-- ================= ROW 2: VEHICLE PHOTOS ================= --}}
         <table class="print-table">
             <tr>
                 <td style="text-align: center; font-weight: bold; padding: 2px; font-size: 9px; border-bottom: 1px solid black;">
@@ -156,6 +183,7 @@
                 <td style="padding: 1px;">
                     <table class="print-inner-table" style="text-align: center;">
                         <tr>
+                            {{-- Each photo takes up 25% of the row --}}
                             <td style="width: 25%;">
                                 <div style="font-size: 8px; font-weight: bold;">Foto Depan<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Image Front</span></div>
                                 <div style="height: 55px; display: flex; align-items: center; justify-content: center; margin-top: 1px;">
@@ -186,10 +214,11 @@
             </tr>
         </table>
 
-        {{-- BAGIAN SPESIFIKASI & HASIL UJI --}}
+        {{-- ================= ROW 3: SPECS & TEST RESULTS ================= --}}
         <table class="print-table">
             <tr>
-                {{-- SPESIFIKASI KIRI --}}
+                
+                {{-- Left Column: Technical Specifications --}}
                 <td style="width: 50%;">
                     <div class="section-title">
                         SPESIFIKASI TEKNIS KENDARAAN<br>
@@ -241,6 +270,8 @@
                             <td>:</td>
                             <td><b>{{ $vehicle->berat_kosong ?? '-' }} kg</b></td>
                         </tr>
+                        
+                        {{-- Sub-section: Dimensions --}}
                         <tr><td colspan="3" style="font-weight: bold; padding-top: 2px;">Dimensi utama kendaraan bermotor (Vehicle main dimension)</td></tr>
                         <tr>
                             <td colspan="3" style="padding:0;">
@@ -260,6 +291,8 @@
                                 </table>
                             </td>
                         </tr>
+                        
+                        {{-- Sub-section: Wheel Base --}}
                         <tr><td colspan="3" style="font-weight: bold; padding-top: 2px;">Jarak sumbu <span style="font-weight:normal; font-style:italic; font-size:7px;">Wheel base</span></td></tr>
                         <tr>
                             <td colspan="3" style="padding:0;">
@@ -270,6 +303,8 @@
                                 </table>
                             </td>
                         </tr>
+                        
+                        {{-- Sub-section: Tub/Tank Dimensions and Capacities --}}
                         <tr>
                             <td>Dimensi bak muatan / tangki</td>
                             <td>:</td>
@@ -304,8 +339,10 @@
                     </table>
                 </td>
                 
-                {{-- HASIL UJI KANAN --}}
+                {{-- Right Column: Test Results & Final Authorization --}}
                 <td style="width: 50%;">
+                    
+                    {{-- Nested table for the Results Matrix --}}
                     <table class="print-inner-table" style="text-align: center; border-bottom: 1px solid #000;">
                         <tr>
                             <td style="width: 25%; font-weight: bold; font-size: 9px; border-right: 1px solid #000; padding: 2px;">Item Uji<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Testing</span></td>
@@ -315,6 +352,8 @@
                     </table>
                     
                     <table class="print-inner-table" style="font-size: 8px;">
+                        
+                        {{-- Brakes Result --}}
                         <tr>
                             <td style="width: 25%; border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px; font-weight: bold;">
                                 Rem Utama<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Brake</span>
@@ -333,6 +372,8 @@
                                 </table>
                             </td>
                         </tr>
+                        
+                        {{-- Headlamp Result --}}
                         <tr>
                             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px; font-weight: bold;">
                                 Lampu Utama<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Head lamp</span>
@@ -350,6 +391,8 @@
                                 : {{ $inspection->deviasi_kiri ?? '-' }}
                             </td>
                         </tr>
+                        
+                        {{-- Emission Result --}}
                         <tr>
                             <td style="border-right: 1px solid #000; border-bottom: 1px solid #000; padding: 2px; font-weight: bold;">
                                 Emisi<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Emission</span>
@@ -365,6 +408,7 @@
                         </tr>
                     </table>
 
+                    {{-- Final Result & Inspector Signature Block --}}
                     <table class="print-inner-table" style="font-size: 8px; margin: 2px;">
                         <tr>
                             <td style="width: 40%; font-weight: bold;">Keterangan<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Inspection result</span></td>
@@ -379,6 +423,8 @@
                         <tr>
                             <td style="font-weight: bold;">Nama petugas<br>penguji<br><span style="font-size:6px; font-weight:normal; font-style:italic;">Name of inspector grade</span></td>
                             <td>:</td>
+                            
+                            {{-- Attempts to get the inspector's name from a relationship (admin), falling back to a static string if needed --}}
                             <td><b>{{ $inspection->admin->nama ?? ($inspection->nama_petugas ?? '-') }}</b></td>
                         </tr>
                         <tr>
@@ -403,10 +449,11 @@
                             </td>
                         </tr>
                         
+                        {{-- Head of Department Signature --}}
                         <tr>
                             <td colspan="3" style="text-align: right; padding-top: 15px; padding-right: 15px;">
                                 <p style="margin: 0;">KEPALA UP / KEPALA DINAS</p>
-                                <div style="height: 35px;"></div> 
+                                <div style="height: 35px;"></div> {{-- Spacer for physical signature --}}
                                 <p style="margin: 0; font-weight: bold; text-decoration: underline;">{{ $inspection->kepala_dinas_nama ?? '-' }}</p>
                                 <p style="margin: 0; font-size:7px;">Pembina Tingkat I - IV/b</p>
                                 <p style="margin: 0; font-size:7px;">NIP {{ $inspection->kepala_dinas_nip ?? '-' }}</p>
@@ -417,13 +464,15 @@
             </tr>
         </table>
         
-        {{-- BAGIAN PALING BAWAH: LOGO KAN (KIRI) DAN KOTAK HIMBAUAN (KANAN) --}}
+        {{-- ================= ROW 4: FOOTER (LOGO & WARNING) ================= --}}
         <table width="100%" style="margin-top: 5px; border:none;">
             <tr>
+                {{-- KAN Accreditation Logo --}}
                 <td width="30%" align="center" valign="middle" style="border:none; padding: 0;">
                     <img src="{{ asset('images/kan-logo-rls.jpeg') }}" style="height: 35px; mix-blend-mode: multiply;" alt="Logo KAN">
                 </td>
                 
+                {{-- Warning/Advisory Box --}}
                 <td width="70%" valign="top" style="border:none; padding: 0;">
                     <div style="padding: 4px; border: 1px solid #d99a9a; background-color: #fbecec;">
                         <table width="100%" style="border:none; margin: 0;">
@@ -444,15 +493,22 @@
             </tr>
         </table>
         
-        {{-- TOMBOL BANTUAN UNTUK MENGULANG PRINT --}}
+        {{-- ================= MANUAL PRINT BUTTON ================= --}}
+        {{-- 
+          Hidden automatically during actual printing via CSS @media print.
+          Provides a fallback if the auto-print script fails or the user cancels and wants to try again.
+        --}}
         <div style="text-align: center; margin-top: 15px;" class="btn-print">
             <button onclick="window.print()" style="padding: 8px 16px; font-weight: bold; cursor: pointer; background-color:#ffc107; border:none; border-radius:5px;">Print / Simpan PDF</button>
         </div>
 
     </div>
 
+    {{-- ================= AUTO-PRINT SCRIPT ================= --}}
     <script>
+        // Executes when the entire page (including images) has fully loaded.
         window.onload = function() {
+            // A slight 600ms delay ensures rendering is complete before triggering the browser's print dialog.
             setTimeout(function() {
                 window.print();
             }, 600);

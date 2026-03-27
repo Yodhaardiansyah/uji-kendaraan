@@ -1,59 +1,93 @@
+{{-- Mewarisi kerangka layout aplikasi --}}
 @extends('layouts.app')
+
+{{-- Mengatur judul halaman dengan memasukkan nomor kendaraan --}}
 @section('title', 'Input Hasil Uji - ' . $vehicle->no_kendaraan)
 
+{{-- Membuka section konten utama --}}
 @section('content')
 <div class="container-fluid pb-5">
+    
+    {{-- 
+      FORM UTAMA PENGUJIAN
+      - action: Mengarah ke route penyimpanan (inspections.store).
+      - method: POST karena kita mengirim data baru.
+      - enctype="multipart/form-data": WAJIB ADA karena form ini menerima input file/gambar (foto kendaraan).
+    --}}
     <form action="{{ route('inspections.store') }}" method="POST" enctype="multipart/form-data" id="formInspection">
+        
+        {{-- Token keamanan CSRF --}}
         @csrf
         
-        {{-- Relasi Utama --}}
+        {{-- 
+          RELASI UTAMA (Hidden Input)
+          Menyimpan ID RFID secara tersembunyi. Data ini krusial agar 
+          hasil uji ini terikat/berelasi dengan kendaraan dan kartu yang tepat di database.
+        --}}
         <input type="hidden" name="rfid_id" value="{{ $rfid->id }}">
 
+        {{-- 
+          BLOK NOTIFIKASI ERROR
+          Akan muncul jika ada input yang tidak sesuai aturan (rules) di Controller saat form disubmit.
+        --}}
         @if ($errors->any())
-        <div class="alert alert-danger shadow-sm border-0 mb-4">
-            <div class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Gagal Menyimpan! Periksa isian berikut:</div>
-            <ul class="mb-0 small">
-                @foreach ($errors->all() as $error)
-                    <li>{{ $error }}</li>
-                @endforeach
-            </ul>
-        </div>
-    @endif
+            <div class="alert alert-danger shadow-sm border-0 mb-4">
+                <div class="fw-bold mb-2"><i class="bi bi-exclamation-triangle-fill me-2"></i>Gagal Menyimpan! Periksa isian berikut:</div>
+                <ul class="mb-0 small">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
+        {{-- ================= HEADER FORM ================= --}}
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-clipboard-check me-2"></i>Form Pengujian Kendaraan Berkala</h4>
                 <p class="text-muted mb-0 small">RFID: <span class="fw-bold text-dark">{{ $rfid->kode_rfid }}</span> | Plat: <span class="badge bg-dark">{{ $vehicle->no_kendaraan }}</span></p>
             </div>
+            
+            {{-- Tombol Batal: Mengembalikan ke halaman riwayat uji RFID terkait --}}
             <a href="{{ route('inspections.index', $rfid->id) }}" class="btn btn-outline-secondary shadow-sm">
                 <i class="bi bi-x-lg"></i> Batal
             </a>
         </div>
 
+        {{-- ================= KONTRAKTUR MULTI-STEP TAB ================= --}}
         <div class="card border-0 shadow-sm overflow-hidden">
+            
+            {{-- NAVIGASI TABS (Bagian Atas) --}}
             <div class="card-header bg-white p-0">
                 <ul class="nav nav-tabs nav-fill border-bottom-0" id="inspectionTab" role="tablist">
+                    {{-- Tab 1 --}}
                     <li class="nav-item">
                         <button class="nav-link active py-3 fw-bold border-0" id="tab-1" data-bs-toggle="tab" data-bs-target="#step-1" type="button">1. FOTO & VISUAL</button>
                     </li>
+                    {{-- Tab 2 --}}
                     <li class="nav-item">
                         <button class="nav-link py-3 fw-bold border-0" id="tab-2" data-bs-toggle="tab" data-bs-target="#step-2" type="button">2. MANUAL</button>
                     </li>
+                    {{-- Tab 3 --}}
                     <li class="nav-item">
                         <button class="nav-link py-3 fw-bold border-0" id="tab-3" data-bs-toggle="tab" data-bs-target="#step-3" type="button">3. ALAT UJI</button>
                     </li>
+                    {{-- Tab 4 --}}
                     <li class="nav-item">
                         <button class="nav-link py-3 fw-bold border-0" id="tab-4" data-bs-toggle="tab" data-bs-target="#step-4" type="button">4. FINALISASI</button>
                     </li>
                 </ul>
             </div>
 
+            {{-- KONTEN TABS (Isi Form) --}}
             <div class="card-body bg-light p-4">
                 <div class="tab-content" id="inspectionTabContent">
                     
-                    {{-- STEP 1: A. FOTO & B. VISUAL --}}
+                    {{-- ================= STEP 1: FOTO & VISUAL ================= --}}
                     <div class="tab-pane fade show active" id="step-1" role="tabpanel">
                         <h6 class="fw-bold text-primary mb-3">A. FOTO KENDARAAN</h6>
+                        
+                        {{-- Menggunakan perulangan untuk membuat 4 input foto (depan, belakang, kanan, kiri) --}}
                         <div class="row mb-4">
                             @foreach(['depan', 'belakang', 'kanan', 'kiri'] as $pos)
                             <div class="col-md-3 mb-3">
@@ -67,6 +101,10 @@
 
                         <h6 class="fw-bold text-primary mb-3">B. PEMERIKSAAN VISUAL (Geser jika Baik)</h6>
                         <div class="row g-2">
+                            {{-- 
+                              Mendefinisikan array associative untuk checklist visual.
+                              Key adalah nama field di database, Value adalah label yang tampil di layar.
+                            --}}
                             @php
                                 $visuals = [
                                     'rangka' => 'Nomor & Kondisi Rangka', 'mesin' => 'Nomor & Tipe Motor Penggerak',
@@ -80,11 +118,17 @@
                                     'converter' => 'Kondisi Converter Kit'
                                 ];
                             @endphp
+                            
+                            {{-- Looping array $visuals menjadi komponen switch toggle (checkbox) --}}
                             @foreach($visuals as $key => $label)
                             <div class="col-md-4 mb-2">
                                 <div class="card border-0 p-2 shadow-sm h-100">
                                     <div class="form-check form-switch mb-0 d-flex align-items-center justify-content-between">
                                         <label class="form-check-label small fw-semibold" for="v_{{ $key }}">{{ $label }}</label>
+                                        {{-- 
+                                          Value="1" menandakan bahwa jika toggle digeser/dicentang, 
+                                          sistem akan menyimpan angka 1 (yang berarti Baik/Lulus) ke database.
+                                        --}}
                                         <input class="form-check-input ms-0" type="checkbox" name="{{ $key }}" value="1" id="v_{{ $key }}">
                                     </div>
                                 </div>
@@ -93,10 +137,11 @@
                         </div>
                     </div>
 
-                    {{-- STEP 2: C. PEMERIKSAAN MANUAL --}}
+                    {{-- ================= STEP 2: PEMERIKSAAN MANUAL ================= --}}
                     <div class="tab-pane fade" id="step-2" role="tabpanel">
                         <h6 class="fw-bold text-primary mb-3">C. PEMERIKSAAN MANUAL (Geser jika Baik)</h6>
                         <div class="row g-2">
+                            {{-- Konsep sama dengan visual, menggunakan array untuk menggenerate checkbox --}}
                             @php
                                 $manuals = [
                                     'penerus_daya' => 'Kondisi Penerus Daya', 'kemudi' => 'Sudut Bebas Kemudi',
@@ -119,10 +164,12 @@
                         </div>
                     </div>
 
-                    {{-- STEP 3: D - H. PEMERIKSAAN ALAT UJI --}}
+                    {{-- ================= STEP 3: PEMERIKSAAN ALAT UJI ================= --}}
                     <div class="tab-pane fade" id="step-3" role="tabpanel">
                         <div class="row g-4">
+                            
                             {{-- D. Emisi --}}
+                            {{-- Input angka dengan type="number". Atribut step="0.01" mengizinkan angka desimal (koma). --}}
                             <div class="col-md-6">
                                 <div class="card border-0 shadow-sm p-3 h-100">
                                     <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">D. EMISI</h6>
@@ -178,12 +225,16 @@
                         </div>
                     </div>
 
-                    {{-- STEP 4: I - M. FINALISASI --}}
+                    {{-- ================= STEP 4: FINALISASI ================= --}}
                     <div class="tab-pane fade" id="step-4" role="tabpanel">
                         <div class="row g-4">
+                            
+                            {{-- Info Hasil Uji Akhir --}}
                             <div class="col-md-6">
                                 <div class="card border-0 shadow-sm p-3 border-top border-warning h-100">
                                     <h6 class="fw-bold mb-3">I. KETERANGAN HASIL UJI</h6>
+                                    
+                                    {{-- Pilihan Dropdown Hasil (Wajib Diisi) --}}
                                     <div class="mb-3">
                                         <label class="form-label fw-bold small">Hasil Akhir</label>
                                         <select name="hasil" class="form-select fw-bold" required>
@@ -192,37 +243,50 @@
                                             <option value="Tidak Lolos Uji Berkala" class="text-danger">Tidak Lolos Uji Berkala</option>
                                         </select>
                                     </div>
+                                    
+                                    {{-- Penanggalan --}}
                                     <div class="row g-2">
+                                        {{-- Tanggal Uji otomatis diisi dengan hari ini menggunakan fungsi date() PHP --}}
                                         <div class="col-6"><label class="small fw-bold">Tanggal Uji</label><input type="date" name="tgl_uji" class="form-control" value="{{ date('Y-m-d') }}"></div>
+                                        
+                                        {{-- Tanggal Berlaku otomatis diisi 6 bulan ke depan menggunakan helper now() Laravel --}}
                                         <div class="col-6">
                                             <label class="small fw-bold">Masa Berlaku</label>
                                             <input type="date" name="tgl_berlaku" class="form-control" value="{{ now()->addMonths(6)->format('Y-m-d') }}">
                                         </div>
                                     </div>
+                                    
+                                    {{-- Unit Pelaksana (Otomatis dari profil admin yang login) --}}
                                     <div class="mt-3">
                                         <label class="small fw-bold text-muted">J. Unit Pelaksana</label>
-                                        {{-- Mengambil dinas dari tabel admin (jika ada), atau fallback ke nama Dishub wilayah --}}
                                         <input type="text" name="nama_unit" class="form-control form-control-sm" 
                                             value="{{ Auth::guard('admin')->user()->dinas ?? ($dishub->nama ?? '-') }}" readonly>
                                     </div>
                                 </div>
                             </div>
                             
+                            {{-- Info Petugas dan Pejabat Penandatangan --}}
                             <div class="col-md-6">
                                 <div class="card border-0 shadow-sm p-3 h-100">
                                     <h6 class="fw-bold mb-3 text-secondary">K, L, M. PETUGAS & PEJABAT</h6>
+                                    
+                                    {{-- Data Petugas Penguji (Otomatis diambil dari session Auth, dibuat readonly agar tidak bisa diedit) --}}
                                     <div class="mb-3 bg-light p-2 rounded">
                                         <label class="small fw-bold text-primary">K. Petugas Penguji</label>
                                         <input type="text" name="nama_petugas" class="form-control form-control-sm mb-1" value="{{ Auth::guard('admin')->user()->nama }}" readonly>
                                         <input type="text" name="nrp" class="form-control form-control-sm mb-1" value="{{ Auth::guard('admin')->user()->nrp }}" readonly>
                                         <input type="text" name="pangkat_petugas" class="form-control form-control-sm" value="{{ Auth::guard('admin')->user()->pangkat }}" readonly>
                                     </div>
+                                    
+                                    {{-- Data Kepala Dinas (Otomatis ditarik dari relasi Dishub tempat admin ditugaskan) --}}
                                     <div class="mb-3">
                                         <label class="small fw-bold text-primary">L. Kepala Dinas</label>
                                         <input type="text" name="kepala_dinas_nama" class="form-control form-control-sm mb-1" value="{{ $dishub->kepala_dinas_nama ?? '' }}" readonly>
                                         <input type="text" name="kepala_dinas_nip" class="form-control form-control-sm mb-1" value="{{ $dishub->kepala_dinas_nip ?? '' }}" readonly>
                                         <input type="text" name="kepala_dinas_pangkat" class="form-control form-control-sm bg-white" value="Kepala Dinas" readonly>
                                     </div>
+                                    
+                                    {{-- Data Direktur --}}
                                     <div>
                                         <label class="small fw-bold text-primary">M. Direktur</label>
                                         <input type="text" name="direktur_nama" class="form-control form-control-sm mb-1" value="{{ $dishub->direktur_nama ?? '' }}" readonly>
@@ -237,11 +301,16 @@
                 </div>
             </div>
 
-            {{-- FOOTER NAVIGASI --}}
+            {{-- ================= FOOTER NAVIGASI (JS CONTROLLER) ================= --}}
             <div class="card-footer bg-white p-3 d-flex justify-content-between">
+                {{-- Tombol Kembali --}}
                 <button type="button" class="btn btn-light px-4 fw-bold border" id="prevBtn" onclick="nextPrev(-1)">KEMBALI</button>
+                
                 <div class="d-flex gap-2">
+                    {{-- Tombol Lanjut --}}
                     <button type="button" class="btn btn-primary px-4 fw-bold" id="nextBtn" onclick="nextPrev(1)">LANJUT</button>
+                    
+                    {{-- Tombol Submit Form (Awalnya disembunyikan pakai d-none) --}}
                     <button type="submit" class="btn btn-success px-5 fw-bold d-none" id="submitBtn">SIMPAN DATA UJI</button>
                 </div>
             </div>
@@ -249,32 +318,53 @@
     </form>
 </div>
 
+{{-- ================= SCRIPT JAVASCRIPT UNTUK LOGIKA MULTI-STEP TAB ================= --}}
 <script>
-    let currentTab = 1;
-    const totalTabs = 4;
+    let currentTab = 1; // Menyimpan posisi tab saat ini (dimulai dari 1)
+    const totalTabs = 4; // Total jumlah tab yang tersedia
 
+    // Fungsi utama untuk menampilkan tab tertentu
     function showTab(n) {
+        // 1. Logika Tombol 'Kembali'
+        // Jika berada di tab pertama (1), sembunyikan tombol kembali. Selain itu, tampilkan.
         document.getElementById("prevBtn").style.visibility = (n === 1) ? "hidden" : "visible";
+        
+        // 2. Logika Tombol 'Lanjut' dan 'Simpan'
+        // Jika sudah mencapai tab terakhir, sembunyikan tombol 'Lanjut', lalu munculkan tombol 'Simpan'
         if (n === totalTabs) {
             document.getElementById("nextBtn").classList.add("d-none");
             document.getElementById("submitBtn").classList.remove("d-none");
         } else {
+            // Jika belum di akhir, pastikan tombol 'Lanjut' tampil, dan tombol 'Simpan' hilang
             document.getElementById("nextBtn").classList.remove("d-none");
             document.getElementById("submitBtn").classList.add("d-none");
         }
+        
+        // 3. Eksekusi API Bootstrap Tab untuk pindah konten visual
         const tabTriggerEl = document.querySelector(`#tab-${n}`);
         const tab = new bootstrap.Tab(tabTriggerEl);
         tab.show();
     }
 
+    // Fungsi trigger saat tombol Lanjut/Kembali diklik
+    // Parameter 'n' bernilai 1 (jika lanjut) atau -1 (jika kembali)
     function nextPrev(n) {
-        currentTab = currentTab + n;
+        currentTab = currentTab + n; // Kalkulasi posisi tab baru
+        
+        // Pencegahan agar tab tidak kurang dari 1 atau lebih dari batas maksimal
         if (currentTab < 1) currentTab = 1;
         if (currentTab > totalTabs) currentTab = totalTabs;
+        
+        // Panggil fungsi render
         showTab(currentTab);
+        
+        // Opsional: Otomatis scroll perlahan ke bagian atas layar setiap pindah tab agar rapi
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    document.addEventListener('DOMContentLoaded', function() { showTab(currentTab); });
+    // Saat halaman web (DOM) pertama kali selesai dimuat, panggil fungsi showTab untuk inisialisasi awal
+    document.addEventListener('DOMContentLoaded', function() { 
+        showTab(currentTab); 
+    });
 </script>
 @endsection

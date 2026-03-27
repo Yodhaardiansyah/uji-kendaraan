@@ -1,24 +1,29 @@
+{{-- Mewarisi kerangka utama website dari 'layouts.app' --}}
 @extends('layouts.app')
 
+{{-- Menentukan judul tab browser --}}
 @section('title', 'Tambah Kendaraan - Dishub System')
 
+{{-- Membuka bagian konten utama --}}
 @section('content')
 <div class="row justify-content-center">
     <div class="col-lg-10">
 
-        {{-- HEADER --}}
+        {{-- ================= HEADER & TOMBOL KEMBALI ================= --}}
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4 class="fw-bold text-primary mb-0"><i class="bi bi-truck me-2"></i>Tambah Data Kendaraan</h4>
+            {{-- Mengarahkan kembali ke daftar kendaraan (vehicles.index) --}}
             <a href="{{ route('vehicles.index') }}" class="btn btn-secondary btn-sm shadow-sm">
                 <i class="bi bi-arrow-left"></i> Kembali
             </a>
         </div>
 
-        {{-- ERROR --}}
+        {{-- ================= BLOK PESAN KESALAHAN (VALIDASI) ================= --}}
+        {{-- Muncul jika Controller melempar error (misal: No Uji duplikat atau field wajib kosong) --}}
         @if ($errors->any())
             <div class="alert alert-danger shadow-sm alert-dismissible fade show">
                 <div class="fw-bold mb-1"><i class="bi bi-exclamation-triangle-fill me-2"></i>Terdapat kesalahan:</div>
-                <ul class="mb-0">
+                <ul class="mb-0 small">
                     @foreach ($errors->all() as $error)
                         <li>{{ $error }}</li>
                     @endforeach
@@ -27,10 +32,15 @@
             </div>
         @endif
 
+        {{-- 
+          FORM PENYIMPANAN DATA KENDARAAN 
+          Action: Mengarah ke route 'vehicles.store' dengan method POST.
+        --}}
         <form method="POST" action="{{ route('vehicles.store') }}">
             @csrf
 
             {{-- ================= A. IDENTITAS PEMILIK ================= --}}
+            {{-- Menghubungkan kendaraan dengan User (Pemilik) yang sudah terdaftar --}}
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-primary text-white fw-bold pt-3">A. Identitas Pemilik Kendaraan</div>
                 <div class="card-body">
@@ -39,9 +49,11 @@
                             <label class="form-label fw-semibold">Nama Pemilik <span class="text-danger">*</span></label>
                             <select name="user_id" class="form-select" required>
                                 <option value="">-- Pilih Pemilik dari Data User --</option>
+                                {{-- Looping data $users yang dikirim dari Controller --}}
                                 @foreach ($users as $user)
+                                    {{-- old('user_id') memastikan pilihan tidak hilang jika validasi gagal --}}
                                     <option value="{{ $user->id }}" {{ old('user_id') == $user->id ? 'selected' : '' }}>
-                                        {{ $user->nama }}
+                                        {{ $user->nama }} (NIK: {{ $user->nomor_identitas }})
                                     </option>
                                 @endforeach
                             </select>
@@ -51,17 +63,18 @@
             </div>
 
             {{-- ================= B. IDENTITAS KENDARAAN ================= --}}
+            {{-- Data legalitas dan administrasi nomor identitas kendaraan --}}
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-primary text-white fw-bold pt-3">B. Identitas Kendaraan Bermotor</div>
                 <div class="card-body">
                     <div class="row g-3">
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">No Uji Kendaraan <span class="text-danger">*</span></label>
-                            <input type="text" name="no_uji" class="form-control" value="{{ old('no_uji') }}" required>
+                            <input type="text" name="no_uji" class="form-control" value="{{ old('no_uji') }}" required placeholder="Contoh: JKB 12345">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">No Kendaraan (Plat) <span class="text-danger">*</span></label>
-                            <input type="text" name="no_kendaraan" class="form-control text-uppercase" value="{{ old('no_kendaraan') }}" required>
+                            <input type="text" name="no_kendaraan" class="form-control text-uppercase" value="{{ old('no_kendaraan') }}" required placeholder="Contoh: B 1234 AB">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label fw-semibold">Nomor Rangka <span class="text-danger">*</span></label>
@@ -88,7 +101,7 @@
                 <div class="card-header bg-primary text-white fw-bold pt-3">C. Spesifikasi Teknis Kendaraan</div>
                 <div class="card-body">
                     
-                    {{-- Sub 1: Info Dasar Mesin & Tipe --}}
+                    {{-- 1. Data Dasar & Mesin --}}
                     <div class="p-3 bg-light rounded mb-4">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">1. Data Dasar & Mesin</h6>
                         <div class="row g-3">
@@ -141,10 +154,11 @@
                         </div>
                     </div>
 
-                    {{-- Sub 2: Berat Kendaraan --}}
+                    {{-- 2. Kapasitas & Berat (Data penting untuk penentuan kelas jalan) --}}
                     <div class="p-3 bg-light rounded mb-4">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">2. Kapasitas & Berat</h6>
                         <div class="row g-3">
+                            {{-- JBB: Jumlah Berat Diperbolehkan, JBI: Jumlah Berat Diizinkan --}}
                             <div class="col-md-2">
                                 <label class="form-label fw-semibold">JBB</label>
                                 <div class="input-group"><input type="number" name="jbb" class="form-control" value="{{ old('jbb') }}"><span class="input-group-text px-2">Kg</span></div>
@@ -172,7 +186,7 @@
                         </div>
                     </div>
 
-                    {{-- Sub 3: Ban & Sumbu --}}
+                    {{-- 3. Ban & Sumbu (Konfigurasi teknis roda) --}}
                     <div class="p-3 bg-light rounded mb-4">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">3. Konfigurasi Roda, Ban & Sumbu</h6>
                         <div class="row g-3">
@@ -184,7 +198,6 @@
                                     <div class="col-md-4"><input type="text" name="ban_ring" class="form-control" value="{{ old('ban_ring') }}" placeholder="Ring (Cth: 14)"></div>
                                 </div>
                             </div>
-                            
                             <div class="col-md-3">
                                 <label class="form-label fw-semibold">Konfigurasi Sumbu</label>
                                 <input type="text" name="konfigurasi_sumbu" class="form-control" value="{{ old('konfigurasi_sumbu') }}" placeholder="Cth: 1.2">
@@ -201,70 +214,43 @@
                                 <label class="form-label fw-semibold">Jarak Sumbu III-IV</label>
                                 <div class="input-group"><input type="number" name="sumbu_3_4" class="form-control" value="{{ old('sumbu_3_4') }}"><span class="input-group-text">mm</span></div>
                             </div>
-                            
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Jalur Depan</label>
-                                <div class="input-group"><input type="number" name="jalur_depan" class="form-control" value="{{ old('jalur_depan') }}"><span class="input-group-text">mm</span></div>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label fw-semibold">Jalur Belakang</label>
-                                <div class="input-group"><input type="number" name="jalur_belakang" class="form-control" value="{{ old('jalur_belakang') }}"><span class="input-group-text">mm</span></div>
-                            </div>
                         </div>
                     </div>
 
-                    {{-- Sub 4: Dimensi --}}
+                    {{-- 4. Dimensi (Ukuran fisik kendaraan) --}}
                     <div class="p-3 bg-light rounded mb-4">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">4. Dimensi Utama & Bak/Tangki</h6>
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-primary">Dimensi Utama Kendaraan</label>
                                 <div class="row g-2">
-                                    <div class="col-4">
-                                        <div class="input-group"><input type="number" name="panjang" class="form-control" value="{{ old('panjang') }}" placeholder="Panjang"><span class="input-group-text p-1">mm</span></div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="input-group"><input type="number" name="lebar" class="form-control" value="{{ old('lebar') }}" placeholder="Lebar"><span class="input-group-text p-1">mm</span></div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="input-group"><input type="number" name="tinggi" class="form-control" value="{{ old('tinggi') }}" placeholder="Tinggi"><span class="input-group-text p-1">mm</span></div>
-                                    </div>
+                                    <div class="col-4"><input type="number" name="panjang" class="form-control" value="{{ old('panjang') }}" placeholder="Panjang"></div>
+                                    <div class="col-4"><input type="number" name="lebar" class="form-control" value="{{ old('lebar') }}" placeholder="Lebar"></div>
+                                    <div class="col-4"><input type="number" name="tinggi" class="form-control" value="{{ old('tinggi') }}" placeholder="Tinggi"></div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-semibold text-primary">Dimensi Bak/Tangki</label>
                                 <div class="row g-2">
-                                    <div class="col-4">
-                                        <div class="input-group"><input type="number" name="panjang_bak" class="form-control" value="{{ old('panjang_bak') }}" placeholder="Panjang"><span class="input-group-text p-1">mm</span></div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="input-group"><input type="number" name="lebar_bak" class="form-control" value="{{ old('lebar_bak') }}" placeholder="Lebar"><span class="input-group-text p-1">mm</span></div>
-                                    </div>
-                                    <div class="col-4">
-                                        <div class="input-group"><input type="number" name="tinggi_bak" class="form-control" value="{{ old('tinggi_bak') }}" placeholder="Tinggi"><span class="input-group-text p-1">mm</span></div>
-                                    </div>
+                                    <div class="col-4"><input type="number" name="panjang_bak" class="form-control" value="{{ old('panjang_bak') }}" placeholder="Panjang"></div>
+                                    <div class="col-4"><input type="number" name="lebar_bak" class="form-control" value="{{ old('lebar_bak') }}" placeholder="Lebar"></div>
+                                    <div class="col-4"><input type="number" name="tinggi_bak" class="form-control" value="{{ old('tinggi_bak') }}" placeholder="Tinggi"></div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    {{-- Sub 5: Daya Angkut & Jalan --}}
+                    {{-- 5. Daya Angkut & Jalan --}}
                     <div class="p-3 bg-light rounded">
                         <h6 class="fw-bold text-secondary mb-3 border-bottom pb-2">5. Daya Angkut & Kelas Jalan</h6>
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Daya Angkut Orang</label>
-                                <div class="input-group">
-                                    <input type="number" name="daya_orang" class="form-control" value="{{ old('daya_orang') }}" placeholder="Jumlah">
-                                    <span class="input-group-text">Penumpang</span>
-                                </div>
+                                <div class="input-group"><input type="number" name="daya_orang" class="form-control" value="{{ old('daya_orang') }}"><span class="input-group-text">Orang</span></div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Daya Angkut Barang</label>
-                                <div class="input-group">
-                                    <input type="number" name="daya_barang" class="form-control" value="{{ old('daya_barang') }}" placeholder="Berat">
-                                    <span class="input-group-text">Kg</span>
-                                </div>
+                                <div class="input-group"><input type="number" name="daya_barang" class="form-control" value="{{ old('daya_barang') }}"><span class="input-group-text">Kg</span></div>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label fw-semibold">Kelas Jalan Terendah</label>
@@ -273,7 +259,6 @@
                                     <option value="Kelas I" {{ old('kelas_jalan') == 'Kelas I' ? 'selected' : '' }}>Kelas I</option>
                                     <option value="Kelas II" {{ old('kelas_jalan') == 'Kelas II' ? 'selected' : '' }}>Kelas II</option>
                                     <option value="Kelas III" {{ old('kelas_jalan') == 'Kelas III' ? 'selected' : '' }}>Kelas III</option>
-                                    <option value="Kelas Khusus" {{ old('kelas_jalan') == 'Kelas Khusus' ? 'selected' : '' }}>Kelas Khusus</option>
                                 </select>
                             </div>
                         </div>
@@ -283,6 +268,7 @@
             </div>
 
             {{-- ================= D. WILAYAH ASAL ================= --}}
+            {{-- Menentukan cabang Dishub tempat kendaraan ini pertama kali didaftarkan --}}
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header bg-primary text-white fw-bold pt-3">D. Wilayah Asal</div>
                 <div class="card-body">
@@ -302,7 +288,7 @@
                 </div>
             </div>
 
-            {{-- SUBMIT BUTTONS --}}
+            {{-- ================= TOMBOL SUBMIT ================= --}}
             <div class="text-end mb-5">
                 <button type="reset" class="btn btn-light shadow-sm me-2 border"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>
                 <button type="submit" class="btn btn-primary shadow-sm px-4"><i class="bi bi-save me-1"></i> Simpan Data Kendaraan</button>

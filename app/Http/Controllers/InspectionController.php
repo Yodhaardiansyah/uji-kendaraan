@@ -6,19 +6,40 @@ use App\Models\Inspection;
 use App\Models\Rfid;
 use App\Models\Dishub;
 use Illuminate\Http\Request;
-use SimpleSoftwareIO\QrCode\Facades\QrCode;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
+/**
+ * Class InspectionController
+ * 
+ * Controller ini digunakan untuk mengelola proses pengujian kendaraan,
+ * meliputi:
+ * - Menampilkan riwayat uji berdasarkan RFID
+ * - Menambahkan data uji baru
+ * - Menampilkan detail hasil uji
+ * - Cetak hasil uji
+ * - Menghapus data uji beserta dokumentasi
+ */
 class InspectionController extends Controller
 {
+    /**
+     * Menampilkan daftar riwayat inspeksi berdasarkan RFID
+     * 
+     * @param \App\Models\Rfid $rfid
+     * @return \Illuminate\View\View
+     */
     public function index(Rfid $rfid)
     {
-        // Mengambil kendaraan dari relasi RFID
+        /**
+         * Ambil data kendaraan dari relasi RFID
+         */
         $vehicle = $rfid->vehicle;
 
-        // Mengambil semua inspeksi yang HANYA terhubung dengan RFID ini
+        /**
+         * Ambil semua data inspeksi berdasarkan RFID ini
+         * - diurutkan dari yang paling lama
+         */
         $inspections = Inspection::where('rfid_id', $rfid->id)
                         ->oldest()
                         ->get();
@@ -26,21 +47,50 @@ class InspectionController extends Controller
         return view('inspections.index', compact('rfid', 'vehicle', 'inspections'));
     }
 
-    // Halaman Form Uji Baru (Dipicu dari Tombol di Modal RFID tadi)
+    /**
+     * Menampilkan form untuk menambahkan uji baru
+     * 
+     * @param \App\Models\Rfid $rfid
+     * @return \Illuminate\View\View
+     */
     public function create(Rfid $rfid)
     {
+        /**
+         * Ambil data kendaraan dari RFID
+         */
         $vehicle = $rfid->vehicle;
-        // Ambil data Dishub berdasarkan wilayah kendaraan untuk auto-fill pejabat
+
+        /**
+         * Ambil data Dishub berdasarkan wilayah kendaraan
+         * - digunakan untuk auto-fill data pejabat/petugas
+         */
         $dishub = Dishub::where('nama', $vehicle->wilayah)->first();
         
         return view('inspections.create', compact('rfid', 'vehicle', 'dishub'));
     }
 
+    /**
+     * Menyimpan hasil inspeksi ke database
+     * 
+     * Proses:
+     * 1. Validasi data input
+     * 2. Ambil data request
+     * 3. Tambahkan admin_id
+     * 4. Upload foto (jika ada)
+     * 5. Proses checkbox (boolean)
+     * 6. Hitung masa berlaku
+     * 7. Simpan ke database
+     * 
+     * @param \Illuminate\Http\Request $request
+     * @return \Illuminate\Http\RedirectResponse
+     */
     public function store(Request $request)
     {
-        // 1. Validasi Data
-        // PENTING: Semua field angka harus diberi 'nullable|numeric' agar form tidak gagal 
-        // jika petugas mengosongkan field tersebut saat pengujian.
+        /**
+         * 1. Validasi Data
+         * - numeric dibuat nullable agar fleksibel
+         * - validasi file gambar maksimal 2MB
+         */
         $request->validate([
             'rfid_id'      => 'required|exists:rfids,id',
             'tgl_uji'      => 'required|date',
@@ -48,13 +98,13 @@ class InspectionController extends Controller
             'nrp'          => 'required|string',
             'nama_petugas' => 'required|string',
             
-            // Validasi Foto (Opsional, maksimal 2MB)
+            // Validasi Foto
             'foto_depan'    => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'foto_belakang' => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'foto_kanan'    => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
             'foto_kiri'     => 'nullable|image|mimes:jpeg,png,jpg|max:2048',
 
-            // Validasi Alat Uji (Angka Desimal / Float)
+            // Validasi Alat Uji (Float)
             'emisi_solar'         => 'nullable|numeric',
             'emisi_co'            => 'nullable|numeric',
             'rem_utama_total'     => 'nullable|numeric',
@@ -70,20 +120,26 @@ class InspectionController extends Controller
             'speed_deviasi'       => 'nullable|numeric',
             'alur_ban'            => 'nullable|numeric',
 
-            // Validasi Alat Uji (Angka Bulat / Integer)
+            // Validasi Integer
             'emisi_hc'    => 'nullable|integer',
             'kebisingan'  => 'nullable|integer',
             'lampu_kanan' => 'nullable|integer',
             'lampu_kiri'  => 'nullable|integer',
         ]);
 
-        // 2. Ambil semua data request kecuali file foto
+        /**
+         * 2. Ambil data request kecuali file
+         */
         $data = $request->except(['foto_depan', 'foto_belakang', 'foto_kanan', 'foto_kiri']);
 
-        // 3. Tambahkan ID Admin yang sedang login
+        /**
+         * 3. Tambahkan ID admin yang login
+         */
         $data['admin_id'] = Auth::guard('admin')->id();
 
-        // 4. Proses Upload Foto (Jika Ada)
+        /**
+         * 4. Upload foto jika ada
+         */
         $fotoFields = ['foto_depan', 'foto_belakang', 'foto_kanan', 'foto_kiri'];
         foreach ($fotoFields as $field) {
             if ($request->hasFile($field)) {
@@ -91,9 +147,10 @@ class InspectionController extends Controller
             }
         }
 
-        // 5. Proses Checkbox (Visual & Manual)
-        // Checkbox di HTML tidak mengirim data jika tidak dicentang.
-        // Kita paksa ubah nilainya menjadi true (1) atau false (0) menggunakan $request->has()
+        /**
+         * 5. Proses checkbox menjadi boolean
+         * - checkbox tidak mengirim value jika tidak dicentang
+         */
         $checkboxes = [
             'rangka', 'mesin', 'tangki', 'pembuangan', 'ban', 'suspensi', 'rem_utama', 'lampu', 'dashboard',
             'spion', 'spakbor', 'bumper', 'perlengkapan', 'teknis', 'darurat', 'badan', 'converter',
@@ -103,36 +160,47 @@ class InspectionController extends Controller
             $data[$cb] = $request->has($cb);
         }
 
-        // 6. Logika Masa Berlaku Otomatis
+        /**
+         * 6. Logika masa berlaku hasil uji
+         */
         if ($request->hasil == 'Lolos Uji Berkala') {
-            // Jika Lolos, masa berlaku = tgl_uji + 6 Bulan
             $data['tgl_berlaku'] = Carbon::parse($request->tgl_uji)->addMonths(6);
         } elseif ($request->hasil == 'Tidak Lolos Uji Berkala') {
-            // Jika tidak lolos, masa berlaku dikosongkan (null)
             $data['tgl_berlaku'] = null;
         }
 
-        // 7. Simpan ke Database
+        /**
+         * 7. Simpan ke database
+         */
         $inspection = Inspection::create($data);
 
-        // 8. Redirect kembali ke halaman Log RFID dengan pesan sukses
+        /**
+         * 8. Redirect ke halaman riwayat inspeksi RFID
+         */
         return redirect()->route('inspections.index', $request->rfid_id)
                          ->with('success', 'Data hasil pengujian berhasil disimpan permanen.');
     }
 
     /**
-     * Menampilkan detail hasil uji (Web View)
+     * Menampilkan detail hasil inspeksi
+     * 
+     * @param \App\Models\Inspection $inspection
+     * @return \Illuminate\View\View
      */
     public function show(Inspection $inspection)
     {
-        // Pastikan memanggil relasi 'user' dari vehicle
+        /**
+         * Load relasi untuk menghindari N+1 query
+         */
         $inspection->load(['rfid.vehicle.user', 'admin']);
         
         $vehicle = $inspection->rfid->vehicle;
         $rfid = $inspection->rfid;
-        $user = $vehicle->user; // Mengambil data pemilik dari tabel users
+        $user = $vehicle->user;
 
-        // Riwayat untuk penanda buku
+        /**
+         * Ambil riwayat inspeksi untuk RFID ini
+         */
         $history = Inspection::where('rfid_id', $rfid->id)
                     ->oldest()
                     ->get();
@@ -141,45 +209,56 @@ class InspectionController extends Controller
     }
 
     /**
-     * Menampilkan halaman khusus cetak (Print/PDF View)
-     * PERUBAHAN: Method baru ditambahkan di sini.
+     * Menampilkan halaman cetak hasil inspeksi
+     * 
+     * @param \App\Models\Inspection $inspection
+     * @return \Illuminate\View\View
      */
     public function print(Inspection $inspection)
     {
+        /**
+         * Load relasi data yang dibutuhkan
+         */
         $inspection->load(['rfid.vehicle.user', 'admin']);
         
         $vehicle = $inspection->rfid->vehicle;
         $rfid = $inspection->rfid;
         $user = $vehicle->user;
 
-        // Kita tidak butuh variabel $history di tampilan cetak, 
-        // jadi tidak perlu di-query lagi.
-
         return view('inspections.print', compact('inspection', 'vehicle', 'rfid', 'user'));
     }
 
     /**
-     * Menghapus riwayat uji beserta foto dokumentasinya.
+     * Menghapus data inspeksi beserta file foto
+     * 
+     * @param \App\Models\Inspection $inspection
+     * @return \Illuminate\Http\RedirectResponse
      */
     public function destroy(Inspection $inspection)
     {
-        // Simpan ID RFID untuk redirect kembali ke log yang benar
+        /**
+         * Simpan ID RFID untuk redirect
+         */
         $rfid_id = $inspection->rfid_id;
 
-        // 1. HAPUS FOTO DARI STORAGE (Penyimpanan Server)
+        /**
+         * 1. Hapus file foto dari storage
+         */
         $fotoFields = ['foto_depan', 'foto_belakang', 'foto_kanan', 'foto_kiri'];
         foreach ($fotoFields as $field) {
-            // Jika field foto tersebut ada isinya di database
             if ($inspection->$field) {
-                // Hapus file fisiknya dari folder storage/app/public/
                 Storage::disk('public')->delete($inspection->$field);
             }
         }
 
-        // 2. HAPUS DATA DARI DATABASE
+        /**
+         * 2. Hapus data dari database
+         */
         $inspection->delete();
 
-        // 3. KEMBALIKAN KE HALAMAN INDEX DENGAN PESAN SUKSES
+        /**
+         * 3. Redirect kembali ke halaman riwayat
+         */
         return redirect()->route('inspections.index', $rfid_id)
                          ->with('success', 'Riwayat uji dan dokumentasi foto berhasil dihapus permanen.');
     }

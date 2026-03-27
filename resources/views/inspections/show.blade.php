@@ -1,33 +1,58 @@
+{{-- Inherit the main application layout --}}
 @extends('layouts.app')
+
+{{-- Set the page title dynamically using the vehicle's license plate --}}
 @section('title', 'Detail Uji - ' . $vehicle->no_kendaraan)
 
+{{-- Begin the main content section --}}
 @section('content')
 <div class="container-fluid pb-5">
     
-    {{-- TOMBOL AKSI --}}
+    {{-- ================= 1. ACTION BUTTONS (TOP BAR) ================= --}}
     <div class="d-flex justify-content-between align-items-center mb-3">
+        
+        {{-- Contextual Back Button based on User Role --}}
         @if(Auth::guard('admin')->check())
+            {{-- If an Admin is logged in, return them to the inspection log for this specific RFID --}}
             <a href="{{ route('inspections.index', $rfid->id) }}" class="btn btn-light border shadow-sm fw-bold">
                 <i class="bi bi-arrow-left me-1"></i> Kembali ke Log
             </a>
         @else
+            {{-- If a regular User (Vehicle Owner) is logged in, return them to the public/user homepage --}}
             <a href="{{ url('/') }}" class="btn btn-light border shadow-sm fw-bold">
                 <i class="bi bi-house-door me-1"></i> Beranda
             </a>
         @endif
 
-        {{-- PERUBAHAN DISINI: Mengarahkan ke route cetak di tab baru --}}
+        {{-- 
+          Print/Download PDF Button 
+          target="_blank" ensures the PDF report opens in a new browser tab, 
+          preventing the user from losing their place on this page.
+        --}}
         <a href="{{ route('inspections.print', $inspection->id) }}" target="_blank" class="btn btn-warning shadow-sm fw-bold px-4 text-dark">
             <i class="bi bi-printer-fill me-2"></i> Cetak / Download PDF
         </a>
     </div>
 
-    {{-- PENANDA BUKU (HISTORY NAVIGATOR) --}}
+    {{-- ================= 2. HISTORY NAVIGATOR (BOOKMARKS) ================= --}}
+    {{-- 
+      This section provides a horizontal scrolling list of all past inspections for this specific RFID.
+      It acts as a quick-access timeline so the user doesn't have to go back to the index to view previous results.
+    --}}
     <div class="card border-0 shadow-sm mb-4 bg-white rounded-3">
         <div class="card-body p-3">
             <h6 class="fw-bold text-muted mb-2 small text-uppercase"><i class="bi bi-bookmarks-fill me-2 text-primary"></i>Riwayat Pengujian Kartu Ini</h6>
+            
+            {{-- overflow-auto and white-space: nowrap create a horizontal scrollable container --}}
             <div class="d-flex gap-2 overflow-auto pb-1" style="white-space: nowrap;">
-               @foreach($history as $index => $item)
+                
+                {{-- Loop through the historical data passed from the Controller --}}
+                @foreach($history as $index => $item)
+                    {{-- 
+                      Visual Indicator:
+                      If the ID of the historical item matches the ID of the currently viewed inspection ($inspection->id),
+                      apply a solid primary color (active state). Otherwise, use an outline style.
+                    --}}
                     <a href="{{ route('inspections.show', $item->id) }}" 
                     class="btn btn-sm rounded-pill px-3 fw-bold transition-all {{ $item->id == $inspection->id ? 'btn-primary shadow' : 'btn-outline-secondary' }}">
                         Uji Ke-{{ $index + 1 }} <span class="ms-1 fw-normal" style="font-size: 0.75rem;">({{ $item->tgl_uji->format('d/m/Y') }})</span>
@@ -37,20 +62,26 @@
         </div>
     </div>
 
-    {{-- KONTEN UTAMA UNTUK TAMPILAN WEB --}}
+    {{-- ================= 3. MAIN CONTENT: THE DIGITAL REPORT ================= --}}
+    {{-- The container is styled to resemble a formal document/certificate --}}
     <div class="card border-0 shadow-sm bg-white" style="font-family: 'Plus Jakarta Sans', sans-serif;">
         <div class="card-body p-3 p-md-4">
             
+            {{-- Report Header --}}
             <div class="text-center border-bottom border-dark border-2 pb-2 mb-3">
                 <h5 class="fw-bolder text-uppercase mb-1 text-dishub">LAPORAN HASIL PENGUJIAN KENDARAAN BERMOTOR</h5>
                 <div class="text-muted small">Nomor RFID: <b class="text-dark">{{ $rfid->kode_rfid }}</b></div>
             </div>
 
+            {{-- --- Section A: Owner and Vehicle Basic Identity --- --}}
             <div class="row g-2 mb-2">
+                
+                {{-- Owner Identity Box --}}
                 <div class="col-md-5">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Identitas Pemilik Kendaraan</div>
                         <div class="p-2">
+                            {{-- Null coalescing (?? '-') prevents errors if the user data is incomplete --}}
                             <table class="table table-sm table-borderless mb-0 data-table">
                                 <tr><td width="35%" class="text-muted">1. Nama Pemilik</td><td width="2%">:</td><td class="fw-bold">{{ $user->nama ?? '-' }}</td></tr>
                                 <tr><td class="text-muted">2. Alamat Pemilik</td><td>:</td><td>{{ $user->alamat ?? '-' }}</td></tr>
@@ -59,6 +90,8 @@
                         </div>
                     </div>
                 </div>
+                
+                {{-- Vehicle Identity Box (Registration Details) --}}
                 <div class="col-md-7">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Identitas Kendaraan Bermotor</div>
@@ -66,6 +99,8 @@
                             <table class="table table-sm table-borderless mb-0 data-table">
                                 <tr><td width="25%" class="text-muted">1. Nomor Uji</td><td width="2%">:</td><td width="25%" class="fw-bold">{{ $vehicle->no_uji }}</td><td width="23%" class="text-muted">4. No. Kendaraan</td><td width="2%">:</td><td class="fw-bold text-dishub fs-6">{{ $vehicle->no_kendaraan }}</td></tr>
                                 <tr><td class="text-muted">2. Nomor SRUT</td><td>:</td><td>{{ $vehicle->no_srut ?? '-' }}</td><td class="text-muted">5. Nomor Mesin</td><td>:</td><td>{{ $vehicle->no_mesin ?? '-' }}</td></tr>
+                                
+                                {{-- Parsing SRUT Date using Carbon. Ensures the date is formatted nicely if it exists --}}
                                 <tr><td class="text-muted">3. Tanggal SRUT</td><td>:</td><td>{{ $vehicle->tgl_srut ? \Carbon\Carbon::parse($vehicle->tgl_srut)->format('d/m/Y') : '-' }}</td><td class="text-muted">6. Nomor Rangka</td><td>:</td><td>{{ $vehicle->no_rangka ?? '-' }}</td></tr>
                             </table>
                         </div>
@@ -73,11 +108,14 @@
                 </div>
             </div>
 
+            {{-- --- Section B: Technical Specifications --- --}}
             <div class="row g-2 mb-2">
                 <div class="col-12">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Spesifikasi Teknis Kendaraan</div>
                         <div class="p-2 row g-0">
+                            
+                            {{-- Specs Column 1 (Engine & Basics) --}}
                             <div class="col-md-4 pe-2 border-end border-secondary-subtle">
                                 <table class="table table-sm table-borderless mb-0 data-table">
                                     <tr><td width="55%" class="text-muted">1. Merk</td><td width="2%">:</td><td class="fw-bold">{{ $vehicle->merk ?? '-' }}</td></tr>
@@ -91,6 +129,8 @@
                                     <tr><td class="text-muted">25. Kelas Jalan</td><td>:</td><td>{{ $vehicle->kelas_jalan ?? '-' }}</td></tr>
                                 </table>
                             </div>
+                            
+                            {{-- Specs Column 2 (Weights & Capacities) --}}
                             <div class="col-md-4 px-2 border-end border-secondary-subtle">
                                 <table class="table table-sm table-borderless mb-0 data-table">
                                     <tr><td width="55%" class="text-muted">8. JBB</td><td width="2%">:</td><td class="fw-bold">{{ $vehicle->jbb ?? '-' }} <span class="text-muted small">kg</span></td></tr>
@@ -104,6 +144,8 @@
                                     <tr><td class="text-muted">24. Daya Angkut Barang</td><td>:</td><td>{{ $vehicle->daya_barang ?? '-' }} <span class="text-muted small">kg</span></td></tr>
                                 </table>
                             </div>
+                            
+                            {{-- Specs Column 3 (Dimensions) --}}
                             <div class="col-md-4 ps-2">
                                 <table class="table table-sm table-borderless mb-0 data-table">
                                     <tr><td colspan="3" class="fw-bold bg-light py-0">16. Dimensi Utama Kendaraan</td></tr>
@@ -122,7 +164,10 @@
                 </div>
             </div>
 
+            {{-- --- Section C: Origin and Photos --- --}}
             <div class="row g-2 mb-2">
+                
+                {{-- Origin Region --}}
                 <div class="col-md-4">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Wilayah Asal</div>
@@ -131,15 +176,22 @@
                         </div>
                     </div>
                 </div>
+                
+                {{-- Vehicle Photos Grid --}}
                 <div class="col-md-8">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Foto Kendaraan</div>
                         <div class="p-2 row g-2 text-center">
+                            
+                            {{-- Iterating over the expected photo fields to dynamically generate image containers --}}
                             @foreach(['depan' => '1. Depan', 'belakang' => '2. Belakang', 'kanan' => '3. Kanan', 'kiri' => '4. Kiri'] as $field => $title)
                                 <div class="col-3">
                                     <div class="border bg-light p-1" style="height: 100px; display: flex; align-items: center; justify-content: center;">
                                         @php $foto = 'foto_' . $field; @endphp
+                                        
+                                        {{-- Conditional logic: Check if the photo field exists and is not null in the database --}}
                                         @if(isset($inspection->$foto) && $inspection->$foto)
+                                            {{-- Use asset('storage/...') to generate the correct public URL for files uploaded to the 'public' disk --}}
                                             <img src="{{ asset('storage/' . $inspection->$foto) }}" class="img-fluid" style="max-height: 90px; object-fit: contain;">
                                         @else
                                             <span class="text-muted small" style="font-size: 0.65rem;">Tidak Ada Foto</span>
@@ -148,17 +200,22 @@
                                     <div class="fw-bold mt-1 text-muted small" style="font-size: 0.7rem;">{{ $title }}</div>
                                 </div>
                             @endforeach
+                            
                         </div>
                     </div>
                 </div>
             </div>
 
+            {{-- --- Section D: Visual and Manual Checks --- --}}
             <div class="row g-2 mb-2">
+                
+                {{-- Visual Checks --}}
                 <div class="col-md-6">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Pemeriksaan Visual</div>
                         <div class="p-2">
                             <div class="row g-1 visual-grid">
+                                {{-- Array map of database columns to display labels --}}
                                 @php
                                     $visualItems = [
                                         'rangka' => '1. Kondisi Rangka', 'mesin' => '2. Tipe Motor', 'tangki' => '3. Kondisi Tangki',
@@ -169,10 +226,14 @@
                                         'badan' => '16. Kondisi Badan/Kaca', 'converter' => '17. Kondisi Converter Kit'
                                     ];
                                 @endphp
+                                
+                                {{-- Loop to generate the visual inspection checklist --}}
                                 @foreach($visualItems as $key => $label)
                                 <div class="col-6 border-bottom border-light-subtle pb-1">
                                     <div class="d-flex justify-content-between pe-2 align-items-center h-100">
                                         <span class="text-muted text-truncate" style="max-width: 80%;" title="{{ $label }}">{{ $label }}</span>
+                                        
+                                        {{-- Determine Badge Color and Text based on the boolean value in the database --}}
                                         <span class="badge {{ isset($inspection->$key) && $inspection->$key ? 'bg-success' : 'bg-danger' }}">
                                             {{ isset($inspection->$key) && $inspection->$key ? 'BAIK' : 'GAGAL' }}
                                         </span>
@@ -183,6 +244,8 @@
                         </div>
                     </div>
                 </div>
+                
+                {{-- Manual Checks --}}
                 <div class="col-md-6">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Pemeriksaan Manual</div>
@@ -212,7 +275,10 @@
                 </div>
             </div>
 
+            {{-- --- Section E: Equipment/Machine Test Results --- --}}
             <div class="row g-2 mb-2 align-items-stretch">
+                
+                {{-- Machine Checks (Emissions & Brakes) --}}
                 <div class="col-md-3">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Pemeriksaan Alat Uji</div>
@@ -223,10 +289,12 @@
                                     <tr><td width="55%" class="text-muted ps-2">Solar</td><td class="text-center fw-bold">{{ $inspection->emisi_solar ?? '-' }} %</td></tr>
                                     <tr><td class="text-muted ps-2">Bensin CO</td><td class="text-center fw-bold">{{ $inspection->emisi_co ?? '-' }} %</td></tr>
                                     <tr><td class="text-muted ps-2">Bensin HC</td><td class="text-center fw-bold">{{ $inspection->emisi_hc ?? '-' }} ppm</td></tr>
+                                    
                                     <tr><td colspan="2" class="fw-bold bg-light mt-1 py-0">2. Rem Utama</td></tr>
                                     <tr><td class="text-muted ps-2">Total Gaya</td><td class="text-center fw-bold">{{ $inspection->rem_utama_total ?? '-' }} %</td></tr>
                                     <tr><td class="text-muted ps-2">Selisih I/II</td><td class="text-center fw-bold">{{ $inspection->rem_utama_selisih_1 ?? '-' }} / {{ $inspection->rem_utama_selisih_2 ?? '-' }} %</td></tr>
                                     <tr><td class="text-muted ps-2">Selisih III/IV</td><td class="text-center fw-bold">{{ $inspection->rem_utama_selisih_3 ?? '-' }} / {{ $inspection->rem_utama_selisih_4 ?? '-' }} %</td></tr>
+                                    
                                     <tr><td colspan="2" class="fw-bold bg-light mt-1 py-0">3. Rem Parkir & 4. Kincup</td></tr>
                                     <tr><td class="text-muted ps-2">Gaya Parkir</td><td class="text-center fw-bold">{{ $inspection->rem_parkir_tangan ?? '-' }} / {{ $inspection->rem_parkir_kaki ?? '-' }} %</td></tr>
                                     <tr><td class="text-muted ps-2">Kincup Roda</td><td class="text-center fw-bold">{{ $inspection->kincup_roda_depan ?? '-' }} mm/m</td></tr>
@@ -236,27 +304,24 @@
                     </div>
                 </div>
 
+                {{-- Various Single Values Box --}}
                 <div class="col-md-2 d-flex flex-column gap-2">
                     <div class="border border-secondary-subtle">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Kebisingan</div>
-                        <div class="p-2 py-2 data-table text-center">
-                            <span class="fw-bold">{{ $inspection->kebisingan ?? '-' }} dbA</span>
-                        </div>
+                        <div class="p-2 py-2 data-table text-center"><span class="fw-bold">{{ $inspection->kebisingan ?? '-' }} dbA</span></div>
                     </div>
                     <div class="border border-secondary-subtle">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Kecepatan</div>
-                        <div class="p-2 py-2 data-table text-center">
-                            <span class="fw-bold">{{ $inspection->speed_deviasi ?? '-' }} km/jam</span>
-                        </div>
+                        <div class="p-2 py-2 data-table text-center"><span class="fw-bold">{{ $inspection->speed_deviasi ?? '-' }} km/jam</span></div>
                     </div>
+                    {{-- flex-grow-1 ensures this bottom box stretches to fill the remaining height of the column --}}
                     <div class="border border-secondary-subtle flex-grow-1">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Kedalaman Alur</div>
-                        <div class="p-2 py-2 data-table text-center">
-                            <span class="fw-bold">{{ $inspection->alur_ban ?? '-' }} mm</span>
-                        </div>
+                        <div class="p-2 py-2 data-table text-center"><span class="fw-bold">{{ $inspection->alur_ban ?? '-' }} mm</span></div>
                     </div>
                 </div>
 
+                {{-- Headlight Checks --}}
                 <div class="col-md-3">
                     <div class="border border-secondary-subtle h-100">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Lampu Utama</div>
@@ -266,6 +331,7 @@
                                     <tr><td colspan="2" class="fw-bold bg-light py-0">1. Kekuatan Pancar</td></tr>
                                     <tr><td width="50%" class="text-muted ps-2">Kanan</td><td class="text-center fw-bold">{{ $inspection->lampu_kanan ?? '-' }} cd</td></tr>
                                     <tr><td class="text-muted ps-2">Kiri</td><td class="text-center fw-bold">{{ $inspection->lampu_kiri ?? '-' }} cd</td></tr>
+                                    
                                     <tr><td colspan="2" class="fw-bold bg-light mt-1 py-0">2. Penyimpangan Lampu</td></tr>
                                     <tr><td class="text-muted ps-2">Kanan</td><td class="text-center fw-bold">{{ $inspection->deviasi_kanan ?? '-' }} °</td></tr>
                                     <tr><td class="text-muted ps-2">Kiri</td><td class="text-center fw-bold">{{ $inspection->deviasi_kiri ?? '-' }} °</td></tr>
@@ -275,13 +341,18 @@
                     </div>
                 </div>
 
+                {{-- Final Result Box (The most important part of the report) --}}
                 <div class="col-md-4">
                     <div class="border border-secondary-subtle h-100 d-flex flex-column">
                         <div class="bg-dishub text-white fw-bold px-2 py-1 small">Keterangan Hasil Uji</div>
+                        
+                        {{-- Centered flexbox to highlight the Pass/Fail status prominently --}}
                         <div class="p-3 d-flex flex-column justify-content-center align-items-center flex-grow-1 text-center bg-light">
                             <h4 class="fw-bolder mb-3 {{ $inspection->hasil == 'Lolos Uji Berkala' ? 'text-success' : 'text-danger' }}">
                                 {{ strtoupper($inspection->hasil ?? 'BELUM DIUJI') }}
                             </h4>
+                            
+                            {{-- Validity Dates --}}
                             <div class="w-100 border-top border-dark pt-3 mt-1 px-2 d-flex flex-column text-muted fw-bold gap-2">
                                 <div class="d-flex justify-content-between"><span>Tanggal Uji:</span> <span class="text-dark">{{ isset($inspection->tgl_uji) ? \Carbon\Carbon::parse($inspection->tgl_uji)->format('d/m/Y') : '-' }}</span></div>
                                 <div class="d-flex justify-content-between"><span>Berlaku S/D:</span> <span class="text-dark">{{ isset($inspection->tgl_berlaku) ? \Carbon\Carbon::parse($inspection->tgl_berlaku)->format('d/m/Y') : '-' }}</span></div>
@@ -291,7 +362,10 @@
                 </div>
             </div>
 
+            {{-- --- Section F: Signatures / Officials --- --}}
             <div class="row g-2 mt-2">
+                
+                {{-- Implementing a standard 4-column layout for the signing officials --}}
                 <div class="col-md-3">
                     <div class="border border-secondary-subtle h-100 text-center p-2">
                         <div class="fw-bold mb-2 text-muted small text-start">Unit Pelaksana</div>
@@ -300,6 +374,7 @@
                         </div>
                     </div>
                 </div>
+                
                 <div class="col-md-3">
                     <div class="border border-secondary-subtle h-100 text-center p-2">
                         <div class="fw-bold mb-2 text-muted small text-start">Petugas Penguji</div>
@@ -309,6 +384,7 @@
                         </div>
                     </div>
                 </div>
+                
                 <div class="col-md-3">
                     <div class="border border-secondary-subtle h-100 text-center p-2">
                         <div class="fw-bold mb-2 text-muted small text-start">Kepala Dinas</div>
@@ -318,6 +394,7 @@
                         </div>
                     </div>
                 </div>
+                
                 <div class="col-md-3">
                     <div class="border border-secondary-subtle h-100 text-center p-2">
                         <div class="fw-bold mb-2 text-muted small text-start">Direktur Pengujian</div>
@@ -327,19 +404,25 @@
                         </div>
                     </div>
                 </div>
+                
             </div>
         </div>
     </div>
 </div>
 
+{{-- ================= CUSTOM PAGE CSS ================= --}}
 <style>
-    /* UTILITIES WARNA DISHUB UNTUK WEB */
+    /* Global Dishub Branding Colors */
     .bg-dishub { background-color: #002d72 !important; }
     .text-dishub { color: #002d72 !important; }
 
-    /* PENGATURAN TABEL & TEKS TAMPILAN WEB */
+    /* Table compression classes. 
+       These rules tightly pack the HTML tables to mimic the dense layout of a physical form.
+    */
     .data-table { font-size: 0.75rem; }
     .data-table td { padding: 0.2rem 0.3rem !important; vertical-align: middle; }
+    
+    /* Specific adjustments for the Visual/Manual grid sections */
     .visual-grid { font-size: 0.70rem; }
     .visual-grid .badge { font-size: 0.6rem; padding: 0.3em 0.5em; }
 </style>
