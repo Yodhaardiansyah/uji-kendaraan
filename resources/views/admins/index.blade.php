@@ -196,7 +196,7 @@
   Method links() otomatis membuat UI pagination jika $dishubs adalah hasil dari paginate() di Controller.
 --}}
 <div class="d-flex justify-content-end mb-4 mt-3">
-    {{ $dishubs->links() }}
+    {{ $dishubs->links('pagination::bootstrap-5') }}
 </div>
 
 {{-- Menutup section 'content' --}}

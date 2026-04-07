@@ -19,152 +19,115 @@ use App\Http\Controllers\{
 |--------------------------------------------------------------------------
 | 1. PUBLIC & AUTH ROUTES
 |--------------------------------------------------------------------------
-| Berisi route untuk halaman utama, autentikasi user dan admin, 
-| serta fitur pengecekan kendaraan publik via RFID.
+| Bagian ini berisi route yang dapat diakses tanpa autentikasi (guest),
+| termasuk halaman utama, login user, dan fitur publik lainnya.
 |--------------------------------------------------------------------------
 */
 
 /**
- * Route untuk halaman utama (Landing Page).
- * Fungsi: Menampilkan view 'welcome' saat user mengakses domain utama website.
+ * Halaman utama (landing page)
  */
-Route::get('/', function () {
-    return view('welcome');
-})->name('home');
+Route::get('/', fn() => view('welcome'))->name('home');
 
 /**
- * GROUP: AUTH USER (PEMILIK KENDARAAN)
- * Middleware 'guest': Route di dalam grup ini hanya bisa diakses oleh 
- * pengunjung yang belum login ke dalam sistem.
+ * AUTH USER (PEMILIK KENDARAAN)
+ * Hanya dapat diakses oleh user yang belum login (guest)
  */
 Route::middleware('guest')->group(function () {
-
-    /**
-     * Menampilkan halaman form login untuk User (Pemilik Kendaraan).
-     * Method Controller: showLogin() dari UserAuthController.
-     */
+    // Menampilkan form login user
     Route::get('/login', [UserAuthController::class, 'showLogin'])->name('login');
 
-    /**
-     * Memproses data submit login dari User.
-     * Method Controller: login() dari UserAuthController.
-     */
+    // Proses autentikasi login user
     Route::post('/login', [UserAuthController::class, 'login']);
 });
 
 /**
- * Memproses permintaan logout untuk User.
- * Middleware 'auth': Memastikan hanya user yang sudah login yang bisa melakukan logout.
- * Method Controller: logout() dari UserAuthController.
+ * Logout user (hanya untuk user yang sudah login)
  */
 Route::post('/logout', [UserAuthController::class, 'logout'])
-    ->name('logout')
-    ->middleware('auth');
+    ->middleware('auth')
+    ->name('logout');
 
 /**
- * Mencetak sertifikat hasil uji/inspeksi kendaraan.
- * Route ini dibuat publik/terbuka (atau setidaknya tidak dibatasi di block ini) 
- * agar user, admin, atau pihak terkait bisa mengunduh/mencetak dokumen.
- * Parameter {inspection} merujuk pada ID inspeksi.
+ * Cetak hasil inspeksi kendaraan (akses publik)
  */
 Route::get('/inspections/{inspection}/print', [InspectionController::class, 'print'])
     ->name('inspections.print');
 
 
-/**
- * GROUP: AUTH ADMIN & SUPERADMIN
- * Prefix 'admin': Semua URL di dalamnya akan diawali dengan '/admin'
- * Name 'admin.': Semua nama route di dalamnya akan diawali dengan 'admin.'
- */
+/*
+|--------------------------------------------------------------------------
+| 2. ADMIN AUTH ROUTES
+|--------------------------------------------------------------------------
+| Route khusus autentikasi admin dan superadmin.
+| Menggunakan guard 'admin'.
+|--------------------------------------------------------------------------
+*/
+
 Route::prefix('admin')->name('admin.')->group(function () {
 
     /**
-     * Middleware 'guest:admin': Hanya untuk admin yang BELUM login.
+     * Login admin (hanya untuk admin yang belum login)
      */
     Route::middleware('guest:admin')->group(function () {
-        
-        /**
-         * Menampilkan halaman form login khusus untuk Admin/Petugas.
-         */
         Route::get('/login', [AdminAuthController::class, 'showLogin'])->name('login');
-        
-        /**
-         * Memproses autentikasi (submit data login) Admin.
-         */
         Route::post('/login', [AdminAuthController::class, 'login']);
     });
 
     /**
-     * Memproses permintaan logout khusus untuk sesi Admin.
-     * Middleware 'auth:admin': Hanya admin yang sudah login yang bisa mengaksesnya.
+     * Logout admin
      */
     Route::post('/logout', [AdminAuthController::class, 'logout'])
-        ->name('logout')
-        ->middleware('auth:admin');
+        ->middleware('auth:admin')
+        ->name('logout');
 });
 
 
-/**
- * GROUP: CEK KENDARAAN PUBLIC (TANPA LOGIN)
- * Mengelompokkan semua route yang menggunakan RfidScanController.
- * Fungsi: Memfasilitasi masyarakat umum atau petugas lapangan untuk mengecek 
- * status kendaraan hanya dengan scan/input kode RFID tanpa perlu login.
- */
+/*
+|--------------------------------------------------------------------------
+| 3. PUBLIC RFID CHECK
+|--------------------------------------------------------------------------
+| Fitur publik untuk mengecek status kendaraan menggunakan RFID
+| tanpa perlu login.
+|--------------------------------------------------------------------------
+*/
+
 Route::controller(RfidScanController::class)->group(function () {
 
-    /**
-     * Menampilkan halaman utama untuk form input/scan RFID umum.
-     */
+    // Halaman input RFID
     Route::get('/cek-kendaraan', 'index')->name('public.index');
 
-    /**
-     * Memproses pencarian data kendaraan berdasarkan input kode RFID dari publik.
-     */
+    // Proses pencarian RFID
     Route::post('/cek-kendaraan/search', 'search')->name('public.search');
 
-    /**
-     * Menampilkan hasil detail scan RFID publik.
-     * Parameter {kode} menerima nilai RFID yang berhasil ditemukan.
-     */
+    // Menampilkan hasil scan RFID
     Route::get('/rfid/check/{kode}', 'show')->name('rfid.public.check');
 });
 
 
 /*
 |--------------------------------------------------------------------------
-| 2. SHARED ACCESS (USER & ADMIN)
+| 4. SHARED ACCESS (USER & ADMIN)
 |--------------------------------------------------------------------------
-| Route ini dilindungi oleh middleware multi-guard.
-| Artinya, baik User biasa ('web') maupun Admin ('admin') yang sudah login
-| dapat mengakses rute-rute di bawah ini tanpa di-redirect kembali ke login.
+| Route yang dapat diakses oleh user maupun admin setelah login.
 |--------------------------------------------------------------------------
 */
+
 Route::middleware(['auth:web,admin'])->group(function () {
 
-    /**
-     * Menampilkan daftar riwayat inspeksi dari satu kendaraan berdasarkan RFID-nya.
-     * Parameter {rfid} merujuk pada kode RFID kendaraan tersebut.
-     */
+    // Daftar riwayat inspeksi berdasarkan RFID
     Route::get('/rfid/{rfid}/inspections', [InspectionController::class, 'index'])
         ->name('inspections.index');
-    
-    /**
-     * Menampilkan detail spesifik dari satu hasil inspeksi (seperti sertifikat digital).
-     * Parameter {inspection} merujuk pada ID inspeksi.
-     */
+
+    // Detail inspeksi kendaraan
     Route::get('/inspections/{inspection}', [InspectionController::class, 'show'])
         ->name('inspections.show');
 
-    /**
-     * Menampilkan halaman pengaturan profil untuk akun yang sedang login (bisa user atau admin).
-     */
+    // Halaman pengaturan profil
     Route::get('/settings', [ProfileController::class, 'index'])
         ->name('profile.setting');
 
-    /**
-     * Memproses pembaruan (update) data profil dari akun yang sedang login.
-     * Menggunakan method HTTP PUT.
-     */
+    // Update profil
     Route::put('/settings', [ProfileController::class, 'update'])
         ->name('profile.update');
 });
@@ -172,17 +135,15 @@ Route::middleware(['auth:web,admin'])->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| 3. USER AREA (PEMILIK KENDARAAN)
+| 5. USER AREA
 |--------------------------------------------------------------------------
-| Area eksklusif yang hanya bisa dimasuki oleh user biasa (guard: web).
+| Area khusus user (pemilik kendaraan)
 |--------------------------------------------------------------------------
 */
+
 Route::middleware('auth:web')->group(function () {
 
-    /**
-     * Menampilkan halaman dashboard utama untuk User (Pemilik Kendaraan).
-     * Biasanya berisi ringkasan kendaraan yang dimiliki dan status uji terkininya.
-     */
+    // Dashboard user
     Route::get('/dashboard', [UserDashboardController::class, 'index'])
         ->name('user.dashboard');
 });
@@ -190,126 +151,113 @@ Route::middleware('auth:web')->group(function () {
 
 /*
 |--------------------------------------------------------------------------
-| 4. ADMIN & SUPERADMIN AREA
+| 6. ADMIN & SUPERADMIN AREA
 |--------------------------------------------------------------------------
-| Area eksklusif untuk pengelola sistem (petugas cabang atau pusat).
-| Semua route menggunakan prefix '/admin' dan butuh login admin ('auth:admin').
+| Area khusus admin dan superadmin dengan prefix '/admin'
 |--------------------------------------------------------------------------
 */
-Route::prefix('admin')->middleware(['auth:admin'])->group(function () {
-    
+
+Route::prefix('admin')->middleware('auth:admin')->group(function () {
+
     /**
-     * Menampilkan Dashboard untuk Admin biasa (misal: Admin Cabang).
+     * Dashboard admin dan superadmin
      */
     Route::get('/dashboard', [DashboardController::class, 'admin'])
         ->name('admin.dashboard');
 
-    /**
-     * Menampilkan Dashboard tingkat tinggi untuk Superadmin (Pusat).
-     * Biasanya memuat data akumulatif seluruh cabang.
-     */
     Route::get('/super-dashboard', [DashboardController::class, 'superadmin'])
         ->name('superadmin.dashboard');
 
     /**
-     * GROUP MANAJEMEN DATA INTI (CRUD RESOURCES)
-     * Route::resource secara otomatis membuat 7 route standar RESTful:
-     * (index, create, store, show, edit, update, destroy).
+     * MASTER DATA (CRUD)
      */
-
-    // Manajemen master data akun User (Pemilik Kendaraan)
     Route::resource('users', UserController::class);
-    
-    // Manajemen master data Kendaraan yang terdaftar
     Route::resource('vehicles', VehicleController::class);
-    
-    // Manajemen pengalokasian/pencatatan kartu/tag RFID
     Route::resource('rfids', RfidController::class);
 
     /**
-     * Mengubah status aktif/non-aktif dari sebuah kartu/tag RFID.
-     * Menggunakan method PATCH karena hanya mengubah sebagian kecil data (status).
+     * Toggle status RFID (aktif/nonaktif)
      */
     Route::patch('/rfids/{id}/toggle', [RfidController::class, 'toggleStatus'])
         ->name('rfids.toggle');
 
     /**
-     * Fitur shortcut di dashboard admin untuk melakukan scan RFID dengan cepat 
-     * dan langsung di-redirect ke halaman hasil data kendaraan bersangkutan.
+     * Redirect hasil pencarian RFID dari dashboard admin
      */
     Route::post('/rfids/search-redirect', [RfidController::class, 'searchRedirect'])
         ->name('admin.rfids.search_redirect');
 
 
-    /**
-     * GROUP: MANAJEMEN INSPEKSI (HANYA ADMIN)
-     * Admin bertugas untuk menginput hasil pemeriksaan/uji kendaraan ke sistem.
-     */
+    /*
+    |--------------------------------------------------------------------------
+    | INSPECTIONS MANAGEMENT
+    |--------------------------------------------------------------------------
+    | Digunakan oleh admin untuk input dan pengelolaan data inspeksi
+    |--------------------------------------------------------------------------
+    */
+
     Route::controller(InspectionController::class)->group(function () {
-
-        /**
-         * Menampilkan form untuk menambahkan data hasil inspeksi baru.
-         * Terikat langsung dengan parameter {rfid} kendaraan yang sedang diuji.
-         */
         Route::get('/inspections/create/{rfid}', 'create')->name('inspections.create');
-
-        /**
-         * Memproses dan menyimpan data hasil uji inspeksi ke database.
-         */
         Route::post('/inspections/store', 'store')->name('inspections.store');
-
-        /**
-         * Menghapus catatan/data inspeksi dari database (misal karena salah input).
-         */
         Route::delete('/inspections/{inspection}', 'destroy')->name('inspections.destroy');
     });
-
-    /**
-     * DATA WILAYAH DISHUB (Akses Baca/Read-Only untuk Admin Biasa)
-     * Admin biasa hanya bisa melihat daftar dan detail wilayah, tidak bisa mengubah.
-     */
-
-    // Melihat daftar wilayah Dishub
-    Route::get('/dishubs', [DishubController::class, 'index'])->name('dishubs.index');
-    
-    // Melihat detail spesifik satu wilayah Dishub
-    Route::get('/dishubs/{dishub}', [DishubController::class, 'show'])->name('dishubs.show');
 
 
     /*
     |--------------------------------------------------------------------------
-    | 5. SUPERADMIN ONLY
+    | DISHUB MANAGEMENT
     |--------------------------------------------------------------------------
-    | Hak akses level tertinggi. Route di bawah ini dilindungi oleh middleware
-    | 'role:superadmin', memastikan admin biasa tidak bisa mengubah pengaturan pusat.
+    | Pengelolaan wilayah Dishub
+    | - Admin: hanya bisa melihat (read)
+    | - Superadmin: bisa CRUD penuh
     |--------------------------------------------------------------------------
     */
+
+    /**
+     * READ ONLY (SEMUA ADMIN)
+     */
+    Route::get('/dishubs', [DishubController::class, 'index'])
+        ->name('dishubs.index');
+
+    Route::get('/dishubs/{dishub}', [DishubController::class, 'show'])
+        ->where('dishub', '[0-9]+') // mencegah konflik dengan 'create'
+        ->name('dishubs.show');
+
+
+    /**
+     * FULL ACCESS (SUPERADMIN ONLY)
+     */
     Route::middleware('role:superadmin')->group(function () {
 
+        Route::get('/dishubs/create', [DishubController::class, 'create'])
+            ->name('dishubs.create');
+
+        Route::post('/dishubs', [DishubController::class, 'store'])
+            ->name('dishubs.store');
+
+        Route::get('/dishubs/{dishub}/edit', [DishubController::class, 'edit'])
+            ->where('dishub', '[0-9]+')
+            ->name('dishubs.edit');
+
+        Route::put('/dishubs/{dishub}', [DishubController::class, 'update'])
+            ->where('dishub', '[0-9]+')
+            ->name('dishubs.update');
+
+        Route::delete('/dishubs/{dishub}', [DishubController::class, 'destroy'])
+            ->where('dishub', '[0-9]+')
+            ->name('dishubs.destroy');
+
         /**
-         * Fitur CRUD (Create, Read, Update, Delete) untuk master data wilayah Dishub.
-         * Kecuali method 'index' dan 'show', karena hak akses read-only 
-         * tersebut sudah diberikan di atas untuk admin biasa.
-         */
-        Route::resource('dishubs', DishubController::class)
-            ->except(['index', 'show']);
-        
-        /**
-         * Fitur CRUD (Create, Read, Update, Delete) untuk manajemen akun
-         * petugas/admin cabang. Hanya superadmin yang berhak menambah/menghapus petugas.
+         * Manajemen admin (superadmin only)
          */
         Route::resource('admins', AdminController::class);
-        
+
         /**
-         * Menampilkan halaman analitik dan statistik tingkat lanjut (pusat).
+         * Analitik & laporan
          */
         Route::get('/analytics', [DashboardController::class, 'analytics'])
             ->name('admin.analytics');
 
-        /**
-         * Mengenerate dan mengunduh laporan (report) dalam format PDF 
-         * dari data-data inspeksi atau pendapatan wilayah.
-         */
         Route::get('/laporan/pdf', [DashboardController::class, 'laporanPdf'])
             ->name('laporan.pdf');
     });
