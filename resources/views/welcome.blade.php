@@ -142,14 +142,27 @@
 
         /* ================= BUTTON USER ================= */
 
-        /* Tombol masuk area user */
+        /* Tombol utama (CTA) */
         .btn-main-action {
-            border: 2px solid #ffe000;
-            color: #ffe000;
+            background: linear-gradient(135deg, #ffe000, #ffd000);
+            color: #002d72;
+            border: none;
             border-radius: 50px;
-            padding: 16px 45px;
+            padding: 14px 40px;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            box-shadow: 0 10px 25px rgba(255, 224, 0, 0.3);
+            transition: all 0.3s ease;
         }
 
+        /* Hover effect */
+        .btn-main-action:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 30px rgba(255, 224, 0, 0.4);
+            color: #002d72;
+        }
         /* ================= FEATURES ================= */
 
         /* Section fitur */
