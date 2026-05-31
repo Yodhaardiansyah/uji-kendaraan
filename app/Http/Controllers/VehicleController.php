@@ -13,11 +13,29 @@ class VehicleController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $wilayah = $request->input('wilayah'); // Menangkap filter wilayah dari URL
 
-        // 1. Query dari model User (Pemilik), pastikan hanya mengambil user yang punya kendaraan
-        $query = \App\Models\User::with(['vehicles.rfids', 'vehicles.user'])->whereHas('vehicles');
+        // 1. Inisiasi Query dari model User (Pemilik)
+        $query = \App\Models\User::query();
 
-        // 2. Jika ada pencarian, cari dari nama/NIK pemilik ATAU dari data kendaraannya
+        // 2. LOGIKA FILTER WILAYAH (Mengatasi Bug Data Hilang)
+        if ($wilayah) {
+            // Ambil hanya user yang memiliki kendaraan di wilayah yang dicari
+            $query->whereHas('vehicles', function($q) use ($wilayah) {
+                $q->where('wilayah', $wilayah);
+            });
+            
+            // Filter juga relasi 'vehicles' agar yang dimuat HANYA kendaraan dari wilayah tersebut
+            $query->with(['vehicles' => function($q) use ($wilayah) {
+                $q->where('wilayah', $wilayah)->with(['rfids', 'user']);
+            }]);
+        } else {
+            // Jika tidak ada filter wilayah, ambil semua user yang punya minimal 1 kendaraan
+            $query->whereHas('vehicles');
+            $query->with(['vehicles.rfids', 'vehicles.user']);
+        }
+
+        // 3. Logika Pencarian Teks Bebas
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('nama', 'like', "%{$search}%")
@@ -30,9 +48,9 @@ class VehicleController extends Controller
             });
         }
 
-        // 3. Cek Role dan terapkan Pagination ke tabel USERS (Pemilik)
+        // 4. Cek Role dan terapkan Pagination ke tabel USERS (Pemilik)
         if (Auth::guard('admin')->check()) {
-            // Paginate berdasarkan Pemilik (Contoh: 10 Pemilik per halaman)
+            // Paginate berdasarkan Pemilik, parameter URL akan dipertahankan
             $users = $query->latest()->paginate(10)->withQueryString();
         } elseif (Auth::check()) {
             // Jika user biasa, hanya ambil dirinya sendiri
@@ -43,8 +61,8 @@ class VehicleController extends Controller
             abort(403, 'Anda belum login.');
         }
 
-        // 4. Trik Rahasia: Ekstrak semua kendaraan dari pemilik yang tampil di halaman ini 
-        // untuk di-passing ke perulangan Modal di tampilan (agar Modalnya tetap berfungsi)
+        // 5. Trik Rahasia: Ekstrak semua kendaraan dari pemilik yang tampil di halaman ini 
+        // untuk di-passing ke perulangan Modal di tampilan
         $vehicles = $users->pluck('vehicles')->flatten();
 
         // Lempar $users (untuk daftar accordion & pagination) dan $vehicles (untuk Modal)
@@ -67,7 +85,6 @@ class VehicleController extends Controller
 
         $request->validate([
             'user_id' => 'required|exists:users,id',
-            // PERBAIKAN: Tambahkan unique:vehicles agar muncul pesan error jika ganda
             'no_uji' => 'required|string|max:50|unique:vehicles,no_uji',
             'no_kendaraan' => 'required|string|max:20|unique:vehicles,no_kendaraan',
             'no_mesin' => 'required|string|unique:vehicles,no_mesin',
@@ -80,7 +97,6 @@ class VehicleController extends Controller
             'bahan_bakar' => 'required|string',
             'wilayah' => 'required|exists:dishubs,nama',
             
-            // Kolom lainnya opsional / nullable
             'cc' => 'nullable|numeric',
             'daya_hp' => 'nullable|numeric',
             'jbb' => 'nullable|numeric',
@@ -95,8 +111,6 @@ class VehicleController extends Controller
             'daya_barang' => 'nullable|numeric|min:0',
         ]);
 
-        // Karena semua fillable sudah didefinisikan di Model,
-        // menggunakan $request->all() lebih bersih daripada mendaftar ulang $request->only([...])
         Vehicle::create($request->all());
 
         return redirect()->route('vehicles.index')
@@ -117,8 +131,6 @@ class VehicleController extends Controller
     {
         $this->authorizeAdmin();
 
-        // PERBAIKAN: Validasi saat update jauh lebih longgar di kodemu.
-        // Kita juga harus tambahkan unique, tapi abaikan ID saat ini (agar tidak error jika data tak diubah)
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'no_uji' => 'required|string|max:50|unique:vehicles,no_uji,' . $vehicle->id,

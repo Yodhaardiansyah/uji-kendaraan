@@ -12,82 +12,47 @@ use Carbon\Carbon;
 
 /**
  * Class DashboardController
- * 
- * Controller ini digunakan untuk menampilkan dashboard berdasarkan role:
+ * * Controller ini digunakan untuk menampilkan dashboard berdasarkan role:
  * - Admin (petugas lapangan)
  * - Superadmin (pusat)
- * 
- * Data yang ditampilkan meliputi statistik, aktivitas terbaru,
+ * * Data yang ditampilkan meliputi statistik, aktivitas terbaru,
  * serta agregasi data untuk visualisasi (grafik).
  */
 class DashboardController extends Controller
 {
     /**
      * Dashboard untuk Admin (Petugas Lapangan / Cabang)
-     * 
-     * Menampilkan:
-     * - Statistik kinerja admin hari ini
-     * - Total data global (kendaraan & RFID)
-     * - Riwayat inspeksi terbaru
-     * - Data kendaraan berdasarkan wilayah
-     * 
-     * @return \Illuminate\View\View
      */
     public function admin()
     {
-        /**
-         * Ambil data admin yang sedang login
-         */
         $admin = Auth::guard('admin')->user();
 
-        /**
-         * Statistik Hari Ini (berdasarkan admin yang login)
-         */
-
-        // Jumlah inspeksi yang dilakukan hari ini
+        // Statistik Hari Ini (berdasarkan admin yang login)
         $ujiHariIni = Inspection::where('admin_id', $admin->id)
                         ->whereDate('created_at', Carbon::today())
                         ->count();
         
-        // Jumlah kendaraan yang lulus uji hari ini
         $lulusUji = Inspection::where('admin_id', $admin->id)
                         ->where('hasil', 'Lolos Uji Berkala')
                         ->whereDate('created_at', Carbon::today())
                         ->count();
 
-        /**
-         * Statistik Global
-         */
-
-        // Total seluruh kendaraan yang terdaftar
+        // Statistik Global
         $totalKendaraan = Vehicle::count();
-
-        // Jumlah RFID yang aktif
         $rfidAktif = Rfid::where('is_active', true)->count();
 
-        /**
-         * Riwayat Inspeksi Terbaru
-         * - mengambil 5 data terakhir
-         * - dengan relasi ke RFID dan Vehicle (eager loading)
-         */
+        // Riwayat Inspeksi Terbaru
         $recentInspections = Inspection::with('rfid.vehicle')
                                 ->where('admin_id', $admin->id)
                                 ->latest()
                                 ->take(5)
                                 ->get();
 
-        /**
-         * Pengelompokan Kendaraan Berdasarkan Wilayah
-         * - digunakan untuk tampilan ringkasan per wilayah
-         * - fallback jika wilayah null
-         */
+        // Pengelompokan Kendaraan Berdasarkan Wilayah
         $vehiclesByRegion = Vehicle::latest()->get()->groupBy(function($item) {
             return $item->wilayah ?? 'Wilayah Tidak Diketahui';
         });
 
-        /**
-         * Kirim data ke view dashboard admin
-         */
         return view('admin.dashboard', compact(
             'admin',
             'ujiHariIni',
@@ -95,68 +60,60 @@ class DashboardController extends Controller
             'totalKendaraan',
             'rfidAktif',
             'recentInspections',
-            'vehiclesByRegion'
+            'vehiclesByRegion',
         ));
     }
 
     /**
      * Dashboard untuk Superadmin (Pusat)
-     * 
-     * Menampilkan:
-     * - Statistik global seluruh sistem
-     * - Data agregasi untuk grafik (jumlah admin per Dishub)
-     * - Data kendaraan berdasarkan wilayah
-     * 
-     * @return \Illuminate\View\View
      */
     public function superadmin()
     {
-        /**
-         * Ambil data admin (superadmin) yang sedang login
-         */
         $admin = Auth::guard('admin')->user();
 
-        /**
-         * Statistik Global Sistem
-         */
-
-        // Total jumlah Dishub (cabang/wilayah)
+        // Statistik Global Sistem
         $totalDishub = Dishub::count();
-
-        // Total admin (tidak termasuk superadmin)
         $totalAdmin = Admin::where('role', 'admin')->count();
-
-        // Total kendaraan
         $totalKendaraan = Vehicle::count();
-
-        // Total RFID (aktif + nonaktif)
         $totalRfid = Rfid::count();
 
-        /**
-         * Data untuk Grafik
-         * - jumlah admin pada setiap Dishub
-         */
-
-        // Ambil Dishub beserta jumlah admin-nya
+        // Data untuk Grafik (jumlah admin per Dishub)
         $dishubStats = Dishub::withCount('admins')->get();
         
-        /**
-         * Format data untuk chart (biasanya digunakan di Chart.js / frontend)
-         * - labels: nama/singkatan wilayah
-         * - data: jumlah admin
-         */
         $chartLabels = $dishubStats->pluck('singkatan')->toJson();
         $chartData = $dishubStats->pluck('admins_count')->toJson();
 
         /**
-         * Pengelompokan kendaraan berdasarkan wilayah
+         * Mengambil SEMUA data kendaraan beserta relasi pemiliknya (user).
+         * Menggunakan with('user') agar query database lebih ringan (mencegah N+1 query issue).
+         * Variabel ini akan di-grouping bertingkat (Provinsi -> Dishub) langsung di level View Blade.
          */
-        $vehiclesByRegion = Vehicle::latest()->get()->groupBy(function($item) {
-            return $item->wilayah ?? 'Wilayah Tidak Diketahui';
+        /**
+         * 1. Ambil data semua kendaraan beserta pemiliknya
+         */
+        $allVehicles = Vehicle::with('user')->latest()->get();
+
+        /**
+         * 2. Ambil data semua Dishub sebagai referensi untuk mencari Provinsi
+         */
+        $dataDishub = Dishub::all();
+
+        /**
+         * 3. Grouping Bertingkat (Kendaraan -> Provinsi -> Wilayah)
+         */
+        $vehiclesByProvinsi = $allVehicles->groupBy(function($vehicle) use ($dataDishub) {
+            // Cari Dishub yang 'nama'-nya sama dengan 'wilayah' kendaraan ini
+            $dishub = $dataDishub->where('nama', $vehicle->wilayah)->first();
+            
+            // Jika ketemu, kembalikan nama provinsinya. Jika tidak, masuk ke 'Lainnya'
+            return $dishub ? $dishub->provinsi : 'Provinsi Tidak Diketahui';
+        })->map(function($grupProvinsi) {
+            // Setelah dikelompokkan per provinsi, pecah lagi per wilayah (Dishub)
+            return $grupProvinsi->groupBy('wilayah');
         });
 
         /**
-         * Kirim data ke view dashboard superadmin
+         * 4. Kirim data ke view dashboard superadmin
          */
         return view('superadmin.dashboard', compact(
             'admin',
@@ -166,7 +123,7 @@ class DashboardController extends Controller
             'totalRfid',
             'chartLabels',
             'chartData',
-            'vehiclesByRegion'
+            'vehiclesByProvinsi' // <--- Variabel baru pengganti allVehicles
         ));
     }
 }

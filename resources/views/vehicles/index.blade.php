@@ -7,11 +7,18 @@
 {{-- Membuka bagian konten utama --}}
 @section('content')
 
+{{-- ================= LOGIKA TAB AKTIF & FILTER ================= --}}
+@php
+    // Mengecek apakah user sedang mencari spesifik berdasarkan wilayah (baik dari form atau redirect URL)
+    $hasWilayahFilter = request()->filled('wilayah');
+    // Jika ada filter wilayah, otomatis aktifkan tab Dishub. Jika tidak, default tab Pemilik.
+    $activeTab = $hasWilayahFilter ? 'dishub' : 'pemilik';
+@endphp
+
 {{-- ================= HEADER HALAMAN & TOMBOL TAMBAH ================= --}}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-truck me-2"></i>Data Kendaraan Bermotor</h4>
     
-    {{-- Pengecekan Role: Tombol Tambah Kendaraan hanya muncul untuk Admin --}}
     @if(Auth::guard('admin')->check())
         <a href="{{ route('vehicles.create') }}" class="btn btn-primary shadow-sm">
             <i class="bi bi-plus-circle me-1"></i> Tambah Kendaraan
@@ -19,130 +26,237 @@
     @endif
 </div>
 
-{{-- ================= FORM PENCARIAN GLOBAL ================= --}}
-<div class="card border-0 shadow-sm mb-4">
+{{-- ================= FORM PENCARIAN GLOBAL & FILTER WILAYAH ================= --}}
+<div class="card border-0 shadow-sm mb-3">
     <div class="card-body p-3">
-        <form action="{{ route('vehicles.index') }}" method="GET" class="d-flex gap-2">
-            <div class="input-group shadow-sm">
+        <form action="{{ route('vehicles.index') }}" method="GET" class="d-flex flex-wrap gap-2">
+            
+            {{-- Input Pencarian Teks Bebas --}}
+            <div class="input-group shadow-sm flex-grow-1" style="min-width: 250px;">
                 <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
-                {{-- value old-input: Mempertahankan teks pencarian agar tidak hilang saat halaman di-refresh --}}
                 <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Cari No Uji, Plat, Merk, atau Nama Pemilik..." value="{{ request('search') }}">
             </div>
-            <button type="submit" class="btn btn-secondary px-4 shadow-sm fw-bold">Cari</button>
+
+            {{-- Dropdown Filter Khusus Wilayah Dishub --}}
+            <select name="wilayah" class="form-select shadow-sm" style="max-width: 250px;">
+                <option value="">-- Semua Wilayah Dishub --</option>
+                {{-- Mengambil daftar wilayah unik dari koleksi kendaraan untuk opsi dropdown --}}
+                @foreach(collect($vehicles)->pluck('wilayah')->unique()->filter()->sort() as $w)
+                    <option value="{{ $w }}" {{ request('wilayah') == $w ? 'selected' : '' }}>
+                        {{ $w }}
+                    </option>
+                @endforeach
+            </select>
+
+            <button type="submit" class="btn btn-secondary px-4 shadow-sm fw-bold">Terapkan</button>
             
-            {{-- Tombol Reset: Hanya muncul jika user sedang melakukan pencarian --}}
-            @if(request('search'))
+            {{-- Tombol Reset muncul jika ada pencarian teks ATAU filter wilayah --}}
+            @if(request('search') || request('wilayah'))
                 <a href="{{ route('vehicles.index') }}" class="btn btn-outline-danger shadow-sm"><i class="bi bi-x-circle"></i> Reset</a>
             @endif
         </form>
     </div>
 </div>
 
-{{-- ================= DAFTAR KENDARAAN (GROUPED BY PEMILIK) ================= --}}
-{{-- 
-  STRUKTUR DATA: 
-  Looping Utama dilakukan terhadap variabel $users (Pemilik). 
-  Di dalam tiap baris pemilik, terdapat tabel daftar kendaraan miliknya.
---}}
-<div class="accordion shadow-sm" id="accordionVehicles">
-    @forelse($users as $owner)
-        @php 
-            $ownerVehicles = $owner->vehicles; // Mengambil relasi kendaraan milik user
-            $collapseId = 'collapseOwner' . $owner->id;
-        @endphp
+{{-- ================= TOGGLE MODE TAMPILAN ================= --}}
+<ul class="nav nav-pills mb-4 bg-white p-2 rounded-3 shadow-sm d-inline-flex" id="viewModeTab" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold {{ $activeTab === 'pemilik' ? 'active' : '' }}" id="pemilik-tab" data-bs-toggle="pill" data-bs-target="#view-pemilik" type="button" role="tab" aria-controls="view-pemilik" aria-selected="{{ $activeTab === 'pemilik' ? 'true' : 'false' }}">
+            <i class="bi bi-person-lines-fill me-2"></i>Per Pemilik
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold {{ $activeTab === 'dishub' ? 'active' : '' }}" id="dishub-tab" data-bs-toggle="pill" data-bs-target="#view-dishub" type="button" role="tab" aria-controls="view-dishub" aria-selected="{{ $activeTab === 'dishub' ? 'true' : 'false' }}">
+            <i class="bi bi-building me-2"></i>Per Dishub
+        </button>
+    </li>
+</ul>
 
-        <div class="accordion-item border-0 mb-3 rounded-3 overflow-hidden">
-            {{-- HEADER ACCORDION (Informasi Pemilik) --}}
-            <h2 class="accordion-header" id="heading{{ $collapseId }}">
-                <button class="accordion-button collapsed bg-white fw-bold text-dark py-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="false">
-                    <div class="d-flex align-items-center w-100 pe-3">
-                        <div class="bg-light p-2 rounded-circle me-3">
-                            <i class="bi bi-person-badge fs-5 text-primary"></i>
+{{-- ================= KONTEN TAMPILAN (TABS) ================= --}}
+<div class="tab-content" id="viewModeTabContent">
+
+    {{-- TAB 1: DAFTAR KENDARAAN (GROUPED BY PEMILIK) --}}
+    <div class="tab-pane fade {{ $activeTab === 'pemilik' ? 'show active' : '' }}" id="view-pemilik" role="tabpanel" aria-labelledby="pemilik-tab">
+        <div class="accordion shadow-sm" id="accordionVehicles">
+            @forelse($users as $owner)
+                @php 
+                    $ownerVehicles = $owner->vehicles; 
+                    $collapseId = 'collapseOwner' . $owner->id;
+                @endphp
+
+                <div class="accordion-item border-0 mb-3 rounded-3 overflow-hidden">
+                    <h2 class="accordion-header" id="heading{{ $collapseId }}">
+                        <button class="accordion-button collapsed bg-white fw-bold text-dark py-3" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="false">
+                            <div class="d-flex align-items-center w-100 pe-3">
+                                <div class="bg-light p-2 rounded-circle me-3">
+                                    <i class="bi bi-person-badge fs-5 text-primary"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-6">{{ $owner->nama ?? 'Pemilik Tidak Diketahui' }}</div>
+                                    <small class="text-muted fw-normal"><i class="bi bi-card-heading me-1"></i>NIK: {{ $owner->nomor_identitas ?? '-' }}</small>
+                                </div>
+                                <div class="ms-auto">
+                                    <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm">
+                                        {{ $ownerVehicles->count() }} Kendaraan
+                                    </span>
+                                </div>
+                            </div>
+                        </button>
+                    </h2>
+                    
+                    <div id="{{ $collapseId }}" class="accordion-collapse collapse" data-bs-parent="#accordionVehicles">
+                        <div class="accordion-body p-0 border-top border-light">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-4 py-3" style="width: 15%;">No. Uji</th>
+                                            <th style="width: 20%;">No. Plat</th>
+                                            <th style="width: 25%;">Merk / Tipe</th>
+                                            <th style="width: 20%;">Jenis</th>
+                                            <th class="text-center" style="width: 20%;">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($ownerVehicles as $item)
+                                            <tr>
+                                                <td class="ps-4 fw-bold text-secondary">{{ $item->no_uji }}</td>
+                                                <td><span class="badge bg-dark fs-6 shadow-sm">{{ $item->no_kendaraan }}</span></td>
+                                                <td>
+                                                    <div class="fw-bold">{{ $item->merk }}</div>
+                                                    <small class="text-muted">{{ $item->tipe }}</small>
+                                                </td>
+                                                <td>{{ $item->jenis }}</td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-info text-white shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDetail{{ $item->id }}">
+                                                        <i class="bi bi-eye me-1"></i> View Detail
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
-                        <div>
-                            <div class="fs-6">{{ $owner->nama ?? 'Pemilik Tidak Diketahui' }}</div>
-                            <small class="text-muted fw-normal"><i class="bi bi-card-heading me-1"></i>NIK: {{ $owner->nomor_identitas ?? '-' }}</small>
-                        </div>
-                        <div class="ms-auto">
-                            <span class="badge bg-primary rounded-pill px-3 py-2 shadow-sm">
-                                {{ $ownerVehicles->count() }} Kendaraan
-                            </span>
-                        </div>
-                    </div>
-                </button>
-            </h2>
-            
-            {{-- BODY ACCORDION (Tabel Daftar Kendaraan Milik User Terkait) --}}
-            <div id="{{ $collapseId }}" class="accordion-collapse collapse" data-bs-parent="#accordionVehicles">
-                <div class="accordion-body p-0 border-top border-light">
-                    <div class="table-responsive">
-                        <table class="table table-hover align-middle mb-0">
-                            <thead class="table-light">
-                                <tr>
-                                    <th class="ps-4 py-3" style="width: 15%;">No. Uji</th>
-                                    <th style="width: 20%;">No. Plat</th>
-                                    <th style="width: 25%;">Merk / Tipe</th>
-                                    <th style="width: 20%;">Jenis</th>
-                                    <th class="text-center" style="width: 20%;">Aksi</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($ownerVehicles as $item)
-                                    <tr>
-                                        <td class="ps-4 fw-bold text-secondary">{{ $item->no_uji }}</td>
-                                        <td><span class="badge bg-dark fs-6 shadow-sm">{{ $item->no_kendaraan }}</span></td>
-                                        <td>
-                                            <div class="fw-bold">{{ $item->merk }}</div>
-                                            <small class="text-muted">{{ $item->tipe }}</small>
-                                        </td>
-                                        <td>{{ $item->jenis }}</td>
-                                        <td class="text-center">
-                                            {{-- Tombol View Detail yang akan memicu Modal --}}
-                                            <button type="button" class="btn btn-sm btn-info text-white shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDetail{{ $item->id }}">
-                                                <i class="bi bi-eye me-1"></i> View Detail
-                                            </button>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
                     </div>
                 </div>
-            </div>
+            @empty
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5 text-muted">
+                        <i class="bi bi-search fs-1 d-block mb-3"></i>
+                        Data tidak ditemukan.
+                    </div>
+                </div>
+            @endforelse
         </div>
-    @empty
-        {{-- Tampilan jika hasil pencarian kosong atau database kosong --}}
-        <div class="card border-0 shadow-sm">
-            <div class="card-body text-center py-5 text-muted">
-                <i class="bi bi-search fs-1 d-block mb-3"></i>
-                @if(request('search'))
-                    Data pemilik/kendaraan dengan kata kunci "<b>{{ request('search') }}</b>" tidak ditemukan.
-                @else
-                    Belum ada data kendaraan yang terdaftar di sistem.
-                @endif
-            </div>
+
+        <div class="d-flex justify-content-end mb-4 mt-3">
+            {{ $users->links('pagination::bootstrap-5') }}
         </div>
-    @endforelse
-</div>
+    </div>
 
-{{-- ================= PAGINATION ================= --}}
-<div class="d-flex justify-content-end mb-4 mt-3">
-    {{-- Pagination dilakukan pada level $users (Pemilik) --}}
-    {{ $users->links('pagination::bootstrap-5') }}
-</div>
+    {{-- TAB 2: DAFTAR KENDARAAN (GROUPED BY DISHUB) --}}
+    <div class="tab-pane fade {{ $activeTab === 'dishub' ? 'show active' : '' }}" id="view-dishub" role="tabpanel" aria-labelledby="dishub-tab">
+        @php
+            $groupedByDishub = collect($vehicles)->groupBy('wilayah');
+            
+            // LOGIKA FILTER: Jika parameter URL 'wilayah' diisi, buang semua grup lain kecuali wilayah yang dicari
+            if (request()->filled('wilayah')) {
+                $groupedByDishub = $groupedByDishub->filter(function($value, $key) {
+                    return $key == request('wilayah');
+                });
+            }
+        @endphp
 
+        <div class="accordion shadow-sm" id="accordionDishub">
+            @forelse($groupedByDishub as $wilayah => $dishubVehicles)
+                @php 
+                    $collapseIdDishub = 'collapseDishub' . Str::slug($wilayah ?: 'unknown');
+                    
+                    // Jika data difilter berdasarkan wilayah spesifik, otomatis BUKA (expand) accordion-nya
+                    $isExpanded = request()->filled('wilayah') && request('wilayah') == $wilayah;
+                @endphp
+
+                <div class="accordion-item border-0 mb-3 rounded-3 overflow-hidden">
+                    <h2 class="accordion-header" id="heading{{ $collapseIdDishub }}">
+                        {{-- Hapus class 'collapsed' dan set aria-expanded='true' jika harus terbuka --}}
+                        <button class="accordion-button bg-white fw-bold text-dark py-3 {{ $isExpanded ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseIdDishub }}" aria-expanded="{{ $isExpanded ? 'true' : 'false' }}">
+                            <div class="d-flex align-items-center w-100 pe-3">
+                                <div class="bg-light p-2 rounded-circle me-3">
+                                    <i class="bi bi-geo-alt fs-5 text-success"></i>
+                                </div>
+                                <div>
+                                    <div class="fs-6">Dishub {{ $wilayah ?: 'Wilayah Tidak Diketahui' }}</div>
+                                </div>
+                                <div class="ms-auto">
+                                    <span class="badge bg-success rounded-pill px-3 py-2 shadow-sm">
+                                        {{ $dishubVehicles->count() }} Kendaraan
+                                    </span>
+                                </div>
+                            </div>
+                        </button>
+                    </h2>
+                    
+                    {{-- Tambahkan class 'show' jika harus terbuka otomatis --}}
+                    <div id="{{ $collapseIdDishub }}" class="accordion-collapse collapse {{ $isExpanded ? 'show' : '' }}" data-bs-parent="{{ $isExpanded ? '' : '#accordionDishub' }}">
+                        <div class="accordion-body p-0 border-top border-light">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-4 py-3" style="width: 25%;">Pemilik</th>
+                                            <th style="width: 15%;">No. Uji</th>
+                                            <th style="width: 20%;">No. Plat</th>
+                                            <th style="width: 20%;">Merk / Tipe</th>
+                                            <th class="text-center" style="width: 20%;">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($dishubVehicles as $item)
+                                            <tr>
+                                                <td class="ps-4 fw-bold">
+                                                    {{ $item->user->nama ?? 'Tidak Diketahui' }}
+                                                </td>
+                                                <td class="text-secondary">{{ $item->no_uji }}</td>
+                                                <td><span class="badge bg-dark fs-6 shadow-sm">{{ $item->no_kendaraan }}</span></td>
+                                                <td>
+                                                    <div class="fw-bold">{{ $item->merk }}</div>
+                                                    <small class="text-muted">{{ $item->tipe }}</small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <button type="button" class="btn btn-sm btn-info text-white shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalDetail{{ $item->id }}">
+                                                        <i class="bi bi-eye me-1"></i> View Detail
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            @empty
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body text-center py-5 text-muted">
+                        <i class="bi bi-building-x fs-1 d-block mb-3"></i>
+                        Data wilayah "<b>{{ request('wilayah') }}</b>" tidak ditemukan.
+                    </div>
+                </div>
+            @endforelse
+        </div>
+    </div>
+
+</div>
 
 {{-- ================= AREA MODAL VIEW LENGKAP ================= --}}
-{{-- 
-  Looping Modal: Dilakukan terhadap $vehicles. 
-  Penting: Modal harus memiliki ID unik (#modalDetail{{ ID }}) agar tidak tertukar datanya.
---}}
+{{-- Kode Modal biarkan sama persis seperti yang Anda berikan, tidak ada perubahan yang dibutuhkan di sini --}}
 @foreach($vehicles as $item)
     <div class="modal fade" id="modalDetail{{ $item->id }}" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            {{-- ... (Isi Modal Detail Tetap Sama) ... --}}
             <div class="modal-content border-0 shadow-lg">
 
-                {{-- MODAL HEADER --}}
                 <div class="modal-header bg-primary text-white">
                     <h5 class="modal-title fw-bold">
                         <i class="bi bi-info-circle me-2"></i> Detail Kendaraan: {{ $item->no_kendaraan }}
@@ -152,11 +266,9 @@
 
                 <div class="modal-body bg-light p-0">
                     @php
-                        // Mencari RFID yang statusnya aktif untuk ditampilkan di Dashboard Modal
                         $activeRfid = $item->rfids->where('is_active', true)->first();
                     @endphp
 
-                    {{-- 1. MODAL TOP BAR: TOMBOL AKSI ADMIN --}}
                     @if(Auth::guard('admin')->check())
                         <div class="p-3 bg-white border-bottom d-flex justify-content-end gap-2">
                             <a href="{{ route('vehicles.edit', $item->id) }}" class="btn btn-warning btn-sm text-dark fw-bold shadow-sm">
@@ -171,10 +283,8 @@
                         </div>
                     @endif
 
-                    {{-- 2. DASHBOARD RFID (STATUS KARTU) --}}
                     <div class="p-4 bg-light border-bottom">
                         <div class="row g-4">
-                            {{-- Info RFID Aktif --}}
                             <div class="col-lg-6">
                                 <div class="card border-0 shadow-sm h-100 bg-white border-start {{ $activeRfid ? 'border-success' : 'border-danger' }}">
                                     <div class="card-body d-flex flex-column justify-content-center">
@@ -197,7 +307,6 @@
                                 </div>
                             </div>
 
-                            {{-- Form Aktivasi RFID Cepat (Hanya Admin) --}}
                             @if(Auth::guard('admin')->check())
                                 <div class="col-lg-6">
                                     <div class="card border border-primary shadow-sm h-100">
@@ -220,7 +329,6 @@
                         </div>
                     </div>
 
-                    {{-- 3. NAV TABS MODAL (Navigasi Antara Info & Riwayat) --}}
                     <ul class="nav nav-tabs pt-3 px-3 bg-white border-bottom-0" role="tablist">
                         <li class="nav-item">
                             <button class="nav-link active fw-bold text-primary" data-bs-toggle="tab" data-bs-target="#tab-info-{{ $item->id }}" type="button" role="tab"><i class="bi bi-file-earmark-text me-1"></i> Spesifikasi Kendaraan</button>
@@ -230,28 +338,24 @@
                         </li>
                     </ul>
 
-                    {{-- ISI KONTEN TABS --}}
                     <div class="tab-content p-4 bg-white">
-                        
-                        {{-- TAB 1: SPESIFIKASI TEKNIS LENGKAP --}}
                         <div class="tab-pane fade show active" id="tab-info-{{ $item->id }}" role="tabpanel">
                             <div class="row g-4">
-                                {{-- Section A & B: Identitas --}}
                                 <div class="col-lg-6">
                                     <div class="card shadow-sm border-0 mb-3 bg-light">
                                         <div class="card-header bg-transparent border-bottom-0 fw-bold text-primary pb-0">A & B. Identitas</div>
                                         <div class="card-body">
                                             <dl class="row mb-0 small">
-                                                <dt class="col-sm-4 text-muted">Nama Pemilik</dt><dd class="col-sm-8 fw-bold">{{ $owner->nama ?? '-' }}</dd>
+                                                <dt class="col-sm-4 text-muted">Nama Pemilik</dt>
+                                                {{-- Sesuaikan nama relasi user jika berbeda --}}
+                                                <dd class="col-sm-8 fw-bold">{{ $item->user->nama ?? '-' }}</dd>
                                                 <dt class="col-sm-4 text-muted">No. Uji</dt><dd class="col-sm-8 fw-bold">{{ $item->no_uji }}</dd>
                                                 <dt class="col-sm-4 text-muted">No. Kendaraan</dt><dd class="col-sm-8"><span class="badge bg-dark">{{ $item->no_kendaraan }}</span></dd>
-                                                {{-- Info teknis lainnya ditarik dari kolom database model Vehicle --}}
                                                 <dt class="col-sm-4 text-muted">No. Rangka</dt><dd class="col-sm-8">{{ $item->no_rangka }}</dd>
                                                 <dt class="col-sm-4 text-muted">No. Mesin</dt><dd class="col-sm-8">{{ $item->no_mesin }}</dd>
                                             </dl>
                                         </div>
                                     </div>
-                                    {{-- Info Berat & Mesin --}}
                                     <div class="card shadow-sm border-0 bg-light">
                                         <div class="card-header bg-transparent border-bottom-0 fw-bold text-primary pb-0">C. Spesifikasi Mesin & Berat</div>
                                         <div class="card-body">
@@ -264,7 +368,6 @@
                                     </div>
                                 </div>
 
-                                {{-- Section C & D: Dimensi & Wilayah --}}
                                 <div class="col-lg-6">
                                     <div class="card shadow-sm border-0 mb-3 bg-light">
                                         <div class="card-header bg-transparent border-bottom-0 fw-bold text-primary pb-0">C. Roda, Ban & Dimensi</div>
@@ -279,7 +382,6 @@
                             </div>
                         </div>
 
-                        {{-- TAB 2: TABEL SEJARAH RFID --}}
                         <div class="tab-pane fade" id="tab-history-{{ $item->id }}" role="tabpanel">
                             <div class="table-responsive">
                                 <table class="table table-hover align-middle mb-0">
@@ -292,7 +394,6 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {{-- Mengambil koleksi RFID kendaraan, diurutkan dari yang terbaru --}}
                                         @forelse($item->rfids()->latest()->get() as $rfid)
                                             <tr class="{{ $rfid->is_active ? 'table-success' : '' }}">
                                                 <td class="ps-3 fw-bold">{{ $rfid->kode_rfid }}</td>

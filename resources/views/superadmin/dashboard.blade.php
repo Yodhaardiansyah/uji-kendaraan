@@ -13,7 +13,7 @@
     </div>
 </div>
 
-{{-- METRIK GLOBAL (Gradient Cards) --}}
+{{-- ================= METRIK GLOBAL (Gradient Cards) ================= --}}
 <div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card border-0 shadow-sm rounded-4 text-white p-3" style="background: linear-gradient(45deg, #FF512F 0%, #DD2476 100%);">
@@ -63,7 +63,7 @@
 
 <div class="row g-4 mb-5">
     
-    {{-- KOLOM KIRI: GRAFIK CHART.JS --}}
+    {{-- ================= KOLOM KIRI: GRAFIK CHART.JS ================= --}}
     <div class="col-lg-7">
         <div class="card border-0 shadow-sm rounded-3 h-100">
             <div class="card-header bg-white py-3 border-0">
@@ -75,7 +75,7 @@
         </div>
     </div>
 
-    {{-- KOLOM KANAN: KENDARAAN PER WILAYAH (ACCORDION) --}}
+    {{-- ================= KOLOM KANAN: PERSEBARAN KENDARAAN ================= --}}
     <div class="col-lg-5">
         <div class="card border-0 shadow-sm rounded-3 h-100">
             <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
@@ -83,39 +83,58 @@
             </div>
             
             <div class="card-body p-3 overflow-auto" style="max-height: 450px;">
-                <div class="accordion accordion-flush" id="accordionWilayah">
+                
+                <div class="accordion accordion-flush" id="accordionProvinsi">
                     
-                    @forelse($vehiclesByRegion as $wilayah => $vehicles)
+                    {{-- Looping Langsung dari Variabel yang dikirim Controller --}}
+                    @forelse($vehiclesByProvinsi as $provinsi => $dishubsInProvinsi)
                         @php 
-                            $collapseId = 'collapseWilayah' . Str::slug($wilayah); 
+                            $collapseIdProvinsi = 'collapseProvinsi' . Str::slug($provinsi); 
+                            
+                            // Menghitung total kendaraan di seluruh dishub dalam 1 provinsi
+                            $totalKendaraanProvinsi = $dishubsInProvinsi->flatten()->count();
                         @endphp
                         
                         <div class="accordion-item border rounded mb-2 shadow-sm">
-                            <h2 class="accordion-header" id="heading{{ $collapseId }}">
-                                <button class="accordion-button collapsed fw-bold py-2 bg-white text-dark rounded" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseId }}" aria-expanded="false">
-                                    <i class="bi bi-geo-alt-fill text-danger me-2"></i> {{ $wilayah }}
+                            
+                            {{-- HEADER PROVINSI --}}
+                            <h2 class="accordion-header" id="heading{{ $collapseIdProvinsi }}">
+                                <button class="accordion-button collapsed fw-bold py-3 bg-white text-dark rounded" type="button" data-bs-toggle="collapse" data-bs-target="#{{ $collapseIdProvinsi }}" aria-expanded="false">
+                                    <i class="bi bi-map-fill text-primary me-2"></i> Provinsi {{ $provinsi }}
                                     
                                     <span class="badge bg-primary rounded-pill ms-auto shadow-sm">
-                                        {{ $vehicles->count() }} Unit
+                                        {{ $totalKendaraanProvinsi }} Kendaraan
                                     </span>
                                 </button>
                             </h2>
-                            <div id="{{ $collapseId }}" class="accordion-collapse collapse" data-bs-parent="#accordionWilayah">
-                                <div class="accordion-body p-3 bg-light border-top">
-                                    
-                                    {{-- Jejeran Plat Nomor Kendaraan --}}
-                                    <div class="d-flex flex-wrap gap-2">
-                                        @foreach($vehicles as $v)
-                                            <a href="{{ route('vehicles.index', ['search' => $v->no_kendaraan]) }}" class="text-decoration-none" title="Pemilik: {{ $v->user->nama ?? '-' }}">
-                                                <span class="badge bg-dark border border-secondary shadow-sm p-2" style="font-size: 0.85rem; letter-spacing: 1px;">
-                                                    {{ $v->no_kendaraan }}
+                            
+                            {{-- BODY PROVINSI (DAFTAR DISHUB) --}}
+                            <div id="{{ $collapseIdProvinsi }}" class="accordion-collapse collapse" data-bs-parent="#accordionProvinsi">
+                                <div class="accordion-body p-2 bg-light border-top">
+                                    <div class="d-flex flex-column gap-2">
+                                        
+                                        {{-- Looping Daftar Link Dishub --}}
+                                        @foreach($dishubsInProvinsi as $wilayah => $vehicles)
+                                            <a href="{{ route('vehicles.index', ['search' => '', 'wilayah' => $wilayah]) }}" 
+                                               class="d-flex justify-content-between align-items-center border rounded p-2 bg-white shadow-sm text-decoration-none transition-all"
+                                               style="transition: all 0.2s ease; cursor: pointer;"
+                                               onmouseover="this.classList.add('bg-light')" 
+                                               onmouseout="this.classList.remove('bg-light')">
+                                               
+                                                <div class="fw-bold text-dark small">
+                                                    <i class="bi bi-geo-alt-fill text-danger me-2"></i> {{ $wilayah ?: 'Wilayah Tidak Diketahui' }}
+                                                </div>
+                                                
+                                                <span class="badge bg-success rounded-pill shadow-sm small">
+                                                    {{ $vehicles->count() }} Unit
                                                 </span>
                                             </a>
                                         @endforeach
+                                        
                                     </div>
-
                                 </div>
                             </div>
+
                         </div>
                     @empty
                         <div class="text-center text-muted py-4">
@@ -125,13 +144,14 @@
                     @endforelse
                     
                 </div>
+
             </div>
         </div>
     </div>
 
 </div>
 
-{{-- SCRIPT CHART.JS --}}
+{{-- ================= SCRIPT CHART.JS ================= --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
