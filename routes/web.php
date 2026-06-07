@@ -29,6 +29,14 @@ use App\Http\Controllers\{
  */
 Route::get('/', fn() => view('welcome'))->name('home');
 
+Route::get('/test-auth', function () {
+    return response()->json([
+        'web' => Auth::guard('web')->check(),
+        'admin' => Auth::guard('admin')->check(),
+        'session_id' => session()->getId(),
+    ]);
+});
+
 /**
  * AUTH USER (PEMILIK KENDARAAN)
  * Hanya dapat diakses oleh user yang belum login (guest)

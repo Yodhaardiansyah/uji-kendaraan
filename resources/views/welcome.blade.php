@@ -184,7 +184,13 @@
 </head>
 
 <body class="d-flex flex-column h-100">
+    @php
+        $isUser = Auth::guard('web')->check();
+        $isAdmin = Auth::guard('admin')->check();
 
+        $user = $isUser ? Auth::guard('web')->user() : null;
+        $admin = $isAdmin ? Auth::guard('admin')->user() : null;
+    @endphp
     <!-- ================= HEADER / NAVBAR ================= -->
     <header>
         <nav class="navbar navbar-expand-lg navbar-custom fixed-top py-3">
@@ -214,9 +220,73 @@
                     </ul>
 
                     <!-- Tombol login admin -->
-                    <a href="{{ route('admin.login') }}" class="btn btn-portal px-4 py-2">
-                        <i class="bi bi-shield-lock-fill"></i> Portal Petugas
-                    </a>
+                     @if($isAdmin)
+
+                        <div class="d-flex align-items-center gap-2">
+
+                            <span class="text-white fw-semibold">
+                                <i class="bi bi-person-badge"></i>
+                                {{ $admin->name }}
+                            </span>
+
+                            <a href="{{ route('admin.dashboard') }}"
+                            class="btn btn-warning px-3 py-2 fw-bold">
+                                <i class="bi bi-speedometer2"></i>
+                                Dashboard
+                            </a>
+
+                            <form action="{{ route('admin.logout') }}"
+                                method="POST"
+                                class="d-inline">
+                                @csrf
+
+                                <button type="submit"
+                                        class="btn btn-outline-light px-3 py-2">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Logout
+                                </button>
+                            </form>
+
+                        </div>
+
+                    @elseif($isUser)
+
+                        <div class="d-flex align-items-center gap-2">
+
+                            <span class="text-white fw-semibold">
+                                <i class="bi bi-person-circle"></i>
+                                {{ $user->name }}
+                            </span>
+
+                            <a href="{{ route('user.dashboard') }}"
+                            class="btn btn-warning px-3 py-2 fw-bold">
+                                <i class="bi bi-speedometer2"></i>
+                                Dashboard
+                            </a>
+
+                            <form action="{{ route('logout') }}"
+                                method="POST"
+                                class="d-inline">
+                                @csrf
+
+                                <button type="submit"
+                                        class="btn btn-outline-light px-3 py-2">
+                                    <i class="bi bi-box-arrow-right"></i>
+                                    Logout
+                                </button>
+                            </form>
+
+                        </div>
+
+                    @else
+
+                        <a href="{{ route('admin.login') }}"
+                        class="btn btn-portal px-4 py-2">
+                            <i class="bi bi-shield-lock-fill"></i>
+                            Portal Petugas
+                        </a>
+
+                    @endif
                 </div>
             </div>
         </nav>
@@ -274,9 +344,27 @@
                         </div>
 
                         <!-- Tombol login user -->
-                        <a href="{{ route('login') }}" class="btn-main-action mt-3">
-                            MASUK AREA PEMILIK
-                        </a>
+                        @if($isUser)
+
+                            <a href="{{ route('user.dashboard') }}" class="btn-main-action mt-3">
+                                <i class="bi bi-speedometer2"></i>
+                                DASHBOARD PEMILIK
+                            </a>
+
+                        @elseif($isAdmin)
+
+                            <a href="{{ route('admin.dashboard') }}" class="btn-main-action mt-3">
+                                <i class="bi bi-speedometer2"></i>
+                                DASHBOARD PETUGAS
+                            </a>
+
+                        @else
+
+                            <a href="{{ route('login') }}" class="btn-main-action mt-3">
+                                MASUK AREA PEMILIK
+                            </a>
+
+                        @endif
                     </div>
                 </div>
             </div>
