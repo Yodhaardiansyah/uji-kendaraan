@@ -107,7 +107,7 @@
               The URL points to the public verification route using the RFID code.
             --}}
             <div style="position: absolute; bottom: 0px; right: 0;">
-                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(70)->margin(0)->generate("https://ekirdishub.arunovasi.com/rfid/check/" . $rfid->kode_rfid) !!}
+                {!! \SimpleSoftwareIO\QrCode\Facades\QrCode::size(70)->margin(0)->generate("https://tapkirku.my.id/rfid/check/" . $rfid->kode_rfid) !!}
             </div>
         </div>
 
