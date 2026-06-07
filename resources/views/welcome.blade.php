@@ -190,8 +190,16 @@
 
         $user = $isUser ? Auth::guard('web')->user() : null;
         $admin = $isAdmin ? Auth::guard('admin')->user() : null;
+
+        $adminDashboardRoute = null;
+
+        if ($isAdmin) {
+            $adminDashboardRoute = strtolower($admin->role) === 'superadmin'
+                ? route('superadmin.dashboard')
+                : route('admin.dashboard');
+        }
     @endphp
-    <!-- ================= HEADER / NAVBAR ================= -->
+        <!-- ================= HEADER / NAVBAR ================= -->
     <header>
         <nav class="navbar navbar-expand-lg navbar-custom fixed-top py-3">
             <div class="container">
@@ -229,7 +237,7 @@
                                 {{ $admin->name }}
                             </span>
 
-                            <a href="{{ route('admin.dashboard') }}"
+                            <a href="{{ $adminDashboardRoute }}"
                             class="btn btn-warning px-3 py-2 fw-bold">
                                 <i class="bi bi-speedometer2"></i>
                                 Dashboard
@@ -353,7 +361,7 @@
 
                         @elseif($isAdmin)
 
-                            <a href="{{ route('admin.dashboard') }}" class="btn-main-action mt-3">
+                            <a href="{{ $adminDashboardRoute }}" class="btn-main-action mt-3">
                                 <i class="bi bi-speedometer2"></i>
                                 DASHBOARD PETUGAS
                             </a>
